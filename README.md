@@ -15,6 +15,9 @@ cvx_save_prefs
         * Unicycle2D: class for implementing Unicycle dynamics. see **multi_robot.m** for example usage.
         * EnvObject2D.m: class for making circular and rectangular objects in environment
 
+3. **tf_object_detection_node**: can be run with launch file **object_detect.launch** with following inputs:
+      * cam_in: monocular image source topic name. default=/usb_cam/image_raw
+
 More robots and objects will be added in future.
 
 ## Run
