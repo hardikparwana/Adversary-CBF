@@ -12,8 +12,8 @@ cvx_save_prefs
 ## Code organization
 1. **predefined_functions**: contains helper functions
 2. **predefined classes**: this project defines robots and obstacles as class objects so that the main code can easily be modified for different robots and environments:
-       * Unicycle2D: class for implementing Unicycle dynamics. see **multi_robot.m** for example usage.
-       * EnvObject2D.m: class for making circular and rectangular objects in environment
+      * Unicycle2D: class for implementing Unicycle dynamics. see **multi_robot.m** for example usage.
+      * EnvObject2D.m: class for making circular and rectangular objects in environment
       
        
 
