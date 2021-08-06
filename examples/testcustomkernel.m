@@ -152,7 +152,6 @@ function kij = squared_exponential_kernel(xi,xj,theta)
     
 end
 
-
 function KMN = mykernel(XM,XN,theta)
     %mykernel - Compute sum of squared exponential and squared exponential ARD.
     %   KMN = mykernel(XM,XN,theta) takes a M-by-D matrix XM, a N-by-D matrix
