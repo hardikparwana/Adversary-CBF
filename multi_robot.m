@@ -135,18 +135,18 @@ for t=0:dt:tf
             %Objective
             minimize( norm( u - u_ref , 2) + norm(slack,2) )              
             
-            % QP solve            
-            cvx_end    
-            
-            % Robot state propagation            
-            for i=1:n_robots
-                
-                ui = u(2*i-1:2*i,1);
-                robot(i) = control_state(robot(i),ui,dt);
-                
-            end
-            
-            pause(0.01)   % to show live plots
+    % QP solve            
+    cvx_end    
+
+    % Robot state propagation            
+    for i=1:n_robots
+
+        ui = u(2*i-1:2*i,1);
+        robot(i) = control_state(robot(i),ui,dt);
+
+    end
+
+    pause(0.01)   % to show live plots
             
 end
 
