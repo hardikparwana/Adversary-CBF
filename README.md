@@ -1,5 +1,5 @@
 # CBF-Adversary
-This repo gives exmaples of multiagent control with cvx library and also gives a library (in form of class) for Multivariate Gaussian Process(Matrix Normal Distribution[MVG](https://en.wikipedia.org/wiki/Matrix_normal_distribution)) Estimation.
+This repo gives exmaples of multiagent control with cvx library and also gives a library (in form of class) for Multivariate Gaussian Process(Matrix Normal Distribution [MVG](https://en.wikipedia.org/wiki/Matrix_normal_distribution)) Estimation.
 
 ## Dependencies
 This code is written in MATLAB. Following additional packages need to be installed for muli_robot.m
