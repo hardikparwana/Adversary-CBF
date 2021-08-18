@@ -1,10 +1,9 @@
 classdef MatrixVariateGaussianProcess <handle
     
-    % x_dot = [f(x) + g(x)]u_bar
-    % u_bar = [1; u]; 
-    % x: n
-    % u: m
-    % F(x) = [f(x) g(x)]: n x (1 + m)
+    % https://en.wikipedia.org/wiki/Matrix_normal_distribution
+    % Refer to above website for basic MVG definitions and terms involved
+    % This code updates the hyperparametrs by maximizing log likelihhod
+    % probability (i.e., maximizing probability of observed training data )
 
     properties(Access = public)
          
@@ -14,18 +13,17 @@ classdef MatrixVariateGaussianProcess <handle
         l;
         
         %Data
-        X;      % input
-        Y;      % output
+        X;      % input training data
+        Y;      % output training data
         N_data; % size of data
-        Ns_data % size of sampled data
+        K_obs;  % store covariance matrix of training data
         
-        %
-        K_obs;
         noise = 0.1;
         
         %Randomly Sampled data for hyperpeter tuning
         Xs;
         Ys;
+        Ns_data % size of sampled data. the parameter update is performed by randomly sampling a subset of training data
         
     end
     
@@ -39,36 +37,22 @@ classdef MatrixVariateGaussianProcess <handle
             obj.l = l;
             
         end
-        
-        % probability of given point
-        function prob = probability(obj,X)
-            prob = exp( -0.5*trace( inv(obj.B)*(X-obj.M)' * inv(obj.A) * (X-obj.M) ) )/ ( (2*pi)^(obj.n*obj.m/2) * det(obj.A)^(obj.m/2) * det(obj.B)^(obj.n/2) );
-        end
-             
-        
-        % vec version of matrix probability
-        function out = vec(obj,X)
        
-            out.mean = matrix_to_vec(obj.M);
-            out.covriance = kron(obj.B,obj.A);
-        
-        end
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%%%%%%%% Methods for basic data manipulation and prediction %%%%%%%%%%%% 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         
-        
+        % Set data for first time
         function set_XY(obj,X,Y)
-            % VERIFIED
             obj.X = X;
             obj.Y = Y;
             obj.N_data = size(X,1);
             obj.get_obs_covariance();
         end
         
+        % add new point to training set
         function add_data(obj,x,y)
-            % VERIFIED
             obj.X = [obj.X; x];
             obj.Y = [obj.Y; y];
             obj.N_data = size(obj.X,1);
@@ -76,12 +60,13 @@ classdef MatrixVariateGaussianProcess <handle
             keyboard
         end
         
+        % Gaussian kernel
         function out = evaluate_kernel(obj,x1,x2)
-            % VERIFIED
             diff = norm(x1-x2,2);
             out = obj.sigma^2 * exp( -diff^2 / ( 2*obj.l^2 ) );
         end
         
+        % Covariance array of new test point and past training points
         function out = get_X_cov(obj,Xnew)
             N = obj.N_data;
             K_star = [0];
@@ -91,8 +76,8 @@ classdef MatrixVariateGaussianProcess <handle
             out = K_star(1:N);
         end
         
-        function out = get_obs_covariance(obj)
-            % VERIFIED           
+        % Covariance matrix of training data input points
+        function out = get_obs_covariance(obj)      
             N = obj.N_data;
             obj.K_obs = zeros(N,N);
             for i =1:1:N
@@ -112,7 +97,6 @@ classdef MatrixVariateGaussianProcess <handle
         
         % Update covariance matrix given new data (run after add_data)
         function out = update_obs_covariance(obj)
-            % VERIFIED
             N = obj.N_data;
             x = obj.X(end,:);
             for i=1:1:N
@@ -127,8 +111,8 @@ classdef MatrixVariateGaussianProcess <handle
             out =  obj.K_obs(1:N, 1:N);
         end
         
+        % Do prediction
         function [mean, cov] = predict(obj,Xnew)
-            % VERIFIED
             N = obj.N_data;
             K_inv = inv(obj.K_obs(1:N,1:N));
             k_star = obj.get_X_cov(Xnew);
@@ -142,6 +126,7 @@ classdef MatrixVariateGaussianProcess <handle
         %%%% They all operate on sampled subset of training set %%%%%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         
+        % Randomly sample a subset of training data
         function [Xs, Ys] = resample(obj,n_samples)
             N = size(obj.X,1);
             idx = randsample([1:1:N],min(n_samples,N));
@@ -162,7 +147,7 @@ classdef MatrixVariateGaussianProcess <handle
             out =  2*obj.sigma * exp(-diff^2 / (2*obj.l^2));            
         end
         
-        % Get derivative of covariance matrix (w.r.t. length scale and sigma)
+        % Get derivative of covariance matrix (w.r.t. length scale and sigma) (of sampled data)
         function [Kl, Ks]  = get_dK(obj)
            
             N = size(obj.Xs,1);
@@ -186,8 +171,8 @@ classdef MatrixVariateGaussianProcess <handle
           
         end       
         
-        function out = get_covariance(obj)
-            % VERIFIED           
+        % Covariance matrix of sampled training points
+        function out = get_covariance(obj)        
             N = obj.Ns_data;
             K_obs = zeros(N,N);
             for i =1:1:N
@@ -205,7 +190,7 @@ classdef MatrixVariateGaussianProcess <handle
             
         end
         
-         % Compute negative log likelihood
+        % Compute negative log likelihood
         function L = log_likelihood(obj)
             n = size(obj.Xs,1); % data size
             d = size(obj.Ys,2); % single output size
@@ -216,7 +201,7 @@ classdef MatrixVariateGaussianProcess <handle
             K = obj.get_covariance();
 
 
-            % Formula assumes prior is 0: V= omega, U=K
+            % Formula assumes prior is 0: V= omega, U=K in https://en.wikipedia.org/wiki/Matrix_normal_distribution
             
             A = inv(K) * obj.Ys * inv(obj.omega) * obj.Ys';               
             L = (n*d/2)*log(2*pi) + (d/2)*log(det(K)) + (n/2)*log(det(obj.omega)) + (1/2)*trace(A);     
@@ -226,17 +211,14 @@ classdef MatrixVariateGaussianProcess <handle
             while (L<-0.001) && iter<20
                 obj.resample(floor(4*Ns/5))
                 K = obj.get_covariance();
-                A = inv(K) * obj.Ys * inv(obj.omega) * obj.Ys';
-                L = (n*d/2)*log(2*pi) + (d/2)*log(det(K)) + (n/2)*log(det(obj.omega)) + (1/2)*trace(A);
+                A = inv(K) * obj.Ys * inv(obj.omega) * obj.Ys';                                         % A2 = inv(obj.omega) * obj.Ys' * inv(K) * obj.Ys;
+                L = (n*d/2)*log(2*pi) + (d/2)*log(det(K)) + (n/2)*log(det(obj.omega)) + (1/2)*trace(A);  % L2 = (n*d/2)*log(2*pi) + (d/2)*log(det(K)) + (n/2)*log(det(obj.omega)) + (1/2)*trace(A2);
                 
-                iter = iter + 1;
-                
-%                 A2 = inv(obj.omega) * obj.Ys' * inv(K) * obj.Ys;
-%                 L2 = (n*d/2)*log(2*pi) + (d/2)*log(det(K)) + (n/2)*log(det(obj.omega)) + (1/2)*trace(A2);    
+                iter = iter + 1;                    
             end    
             
             if L<-0.01
-                    disp("*************** WARN:   L < 0 **********************")
+%                     disp("*************** WARN:   L < 0 **********************")
                     L = 0.001;
             end
 
@@ -278,8 +260,7 @@ classdef MatrixVariateGaussianProcess <handle
             end    
             
             if L<-0.01
-                    disp("*************** WARN:   L < 0 **********************")
-%                     keyboard
+%                     disp("*************** WARN:   L < 0 **********************")
                     L = 0.001;
             end
 
@@ -313,8 +294,8 @@ classdef MatrixVariateGaussianProcess <handle
             alter_iter = 2;
             
             grad_max = 50; %50
-            omega_grad_max = 40;
-            rate = 0.005;%0.0005;
+            omega_grad_max = 40;            
+            rate = 0.005; % Learning rate   %0.0005;
             
             mode = randi(3);
             
@@ -340,11 +321,7 @@ classdef MatrixVariateGaussianProcess <handle
                 
                 Ns_org = obj.Ns_data;
                 obj.resample(floor(4*Ns_org/2));
-%                 obj.Xs = obj.X;
-%                 obj.Ys = obj.Y;
-%                 obj.Ns_data = obj.N_data;
                 [dL_dl, dL_ds, dL_domega] = obj.likelihood_gradients();
-%                 keyboard
                 dL_dl = obj.clip(dL_dl, grad_max, -grad_max);
                 dL_ds = obj.clip(dL_ds, grad_max, -grad_max);
                 if ( (max(max(dL_domega)) > omega_grad_max) || (min(min(dL_domega)) < -omega_grad_max) )
@@ -356,7 +333,8 @@ classdef MatrixVariateGaussianProcess <handle
                 
                 % Gradient descent
                 eps = 0.0005;
-%                 mode = 3;
+
+                % Update only one parameter at a time
                 if mode==1
                     cur_omega = cur_omega - rate * dL_domega;
                     try
@@ -388,6 +366,7 @@ classdef MatrixVariateGaussianProcess <handle
                     keyboard
                 end
                 
+                % sigma cannot be negative so constrain it
                 if cur_sigma<0
                     cur_sigma = 0;
                 end
@@ -417,12 +396,10 @@ classdef MatrixVariateGaussianProcess <handle
                         keyboard
                     end
                 end
-                % Save parameters and likeliobj.get_obs_covariance();obj.get_obs_covariance();hoods
+                
+                % Print training status
                 if mod(iters, 10 == 0)
                     fprintf("Iteration: %d, mode: %d, Likelihood for this dataset: %f, der: %f, %f, %f \n", iters, mode, value, dL_dl, dL_ds, dL_domega)
-%                 if (iters % 50 == 0 and kSave):
-%                     np.save('likelihood_vals_robot_v' + str(iteration), vals)
-%                     np.save('parameters_robot_v' + str(iteration), [params_omega, params_sigma, params_l]
                 end
    
             end
@@ -433,7 +410,31 @@ classdef MatrixVariateGaussianProcess <handle
         
 
         end
+        
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%  Extra Unsed Functions: UNDER DEVELOPMENT, DO NOT USE %%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % probability of given point           
+        function prob = probability(obj,X)
+            prob = exp( -0.5*trace( inv(obj.B)*(X-obj.M)' * inv(obj.A) * (X-obj.M) ) )/ ( (2*pi)^(obj.n*obj.m/2) * det(obj.A)^(obj.m/2) * det(obj.B)^(obj.n/2) );
+        end
+             
+        
+        % vec version of matrix probability
+        function out = vec(obj,X)
+       
+            out.mean = matrix_to_vec(obj.M);
+            out.covriance = kron(obj.B,obj.A);
+        
+        end
     
     end
      
 end
+
+
+% x_dot = [f(x) + g(x)]u_bar
+% u_bar = [1; u]; 
+% x: n
+% u: m
+% F(x) = [f(x) g(x)]: n x (1 + m)
