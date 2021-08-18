@@ -365,8 +365,8 @@ classdef MatrixVariateGaussianProcess <handle
                         keyboard
                     end
                     for i=1:1:size(D,1)
-                        if (D(i) <= eps)
-                            D(i) = eps;
+                        if (D(i,i) <= eps)
+                            D(i,i) = eps;
                         end
                     end
                     cur_omega = V * D * inv(V);
