@@ -1,3 +1,8 @@
+% A single output vector y is assumed to be arranged in a row vector 
+% Multiple outout vectors concatenated so that the training Y coulmns
+% corresponds to different training points and rows correspond to output of
+% a single training point.
+
 close all;
 clear all;
 
