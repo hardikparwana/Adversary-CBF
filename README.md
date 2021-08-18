@@ -15,6 +15,7 @@ cvx_save_prefs
 2. **predefined classes**: this project defines robots and obstacles as class objects so that the main code can easily be modified for different robots and environments:
       * Unicycle2D: class for implementing Unicycle dynamics. see **multi_robot.m** for example usage.
       * EnvObject2D.m: class for making circular and rectangular objects in environment
+      * MatrixVariateGaussianProcess.m: class for prediction and hyperpameter tuning of multivariate Gaussian Process where the quantity to be predicted is a vector instead of scalar. See **test_MVG.m** for example usage.
       
        
 
@@ -22,4 +23,4 @@ More robots and objects will be added in future.
 
 ## Run
 1. Simply add subfolders to MATLAB path and then run **multi_robot.m**
-2. To test MVG, simply run **test_MVG.m**
+2. To test MVG, add subfolders to MATLAB path and then simply run **test_MVG.m**
