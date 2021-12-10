@@ -47,41 +47,39 @@ disp(gp.l)
 %% Independent GP
 gp_normal(1) = MatrixVariateGaussianProcess(1,sigma,l);
 gp_normal(2) = MatrixVariateGaussianProcess(1,sigma,l);
-gp_normal(1).set_XY(X,y(:,1));
-gp_normal(2).set_XY(X,y(:,2));
-gp_normal(1).resample(N);
-gp_normal(2).resample(N);
+gp.set_XY(X,y);
+gp.resample(N);
 max_iter = 10;
 gp_normal(1).fit(max_iter,1);
 gp_normal(2).fit(max_iter,1);
 
-disp("UniVariate GP 1 ")
+disp("UniVariate GP")
 disp("New Parameters: ")
 disp("Sigma")
-fprintf("GP1: Sigma: %f, L: %f \n",gp_normal(1).sigma,gp_normal(1).l)
-fprintf("GP2: Sigma: %f, L: %f ",gp_normal(2).sigma,gp_normal(2).l)
+disp(gp.sigma)
+disp("l")
+disp(gp.l)
 
 %% Plot y1 = sin(X) prediction
 index = 1;
 figure(1)
-plot_results(N,X,y,gp_org,gp,gp_normal(index),index)
+plot_results(N,X,y,gp_org,gp,index)
 
 
 %% Plot y1 = cos(X) prediction
 index = 2;
 figure(2)
-plot_results(N,X,y,gp_org,gp,gp_normal(index),index)
+plot_results(N,X,y,gp_org,gp,index)
 
 %% Function definitions
 
-function plot_results(N,X,y,gp_org,gp,gp_normal,index)
+function plot_results(N,X,y,gp_org,gp,index)
 
     plot(X,y(:,index),'k--','LineWidth',2)
     hold on
 
     y_org = zeros(N,3);    % mean, mean-cov, mean+cov for N data points
     y_train = zeros(N,3);  % mean, mean-cov, mean+cov for N data points
-    y_normal = zeros(N,3);  % mean, mean-cov, mean+cov for N data points
     factor_org = 5;     % factor times covariance
     factor_train = 5;  % factor times covariance
 
@@ -90,19 +88,15 @@ function plot_results(N,X,y,gp_org,gp,gp_normal,index)
         y_org(i,:) = [mean(index), mean(index)+factor_org*cov(index,index), mean(index)-factor_org*cov(index,index)];
         [mean, cov] = gp.predict(X(i,:));
         y_train(i,:) = [mean(index), mean(index)+factor_train*cov(index,index), mean(index)-factor_train*cov(index,index)];
-        [mean, cov] = gp_normal.predict(X(i,:));
-        y_normal(i,:) = [mean, mean+factor_train*cov, mean-factor_train*cov];
     end
 
     plot(X,y_org(:,1),'r')
     plot(X,y_train(:,1),'g')
-    plot(X,y_normal(:,1),'c')
 
     patch([X;flipud(X)],[y_org(:,2);flipud(y_org(:,3))],'m','FaceAlpha',0.1); 
     patch([X;flipud(X)],[y_train(:,2);flipud(y_train(:,3))],'b','FaceAlpha',0.1); 
-    patch([X;flipud(X)],[y_normal(:,2);flipud(y_normal(:,3))],'c','FaceAlpha',0.1); 
     
     xlabel("X")
     ylabel("Function value")
-    legend("True values",'Untrained GP prediction','Trained GP prediction','Normal GP prediction','Untrained Uncertaimnty bounds','Trained Uncertainty bound','Normal Uncertainty bound')
+    legend("True values",'Untrained GP prediction','Trained GP prediction','Untrained Uncertaimnty bounds','Trained Uncertainty bound')
  end
