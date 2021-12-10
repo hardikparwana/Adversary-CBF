@@ -2,7 +2,7 @@ classdef Unicycle2D
 
         properties(Access = public)
            id = 1;
-           X = [0;0];
+           X = [0;0;0];
            yaw = 0;
            
            G = [0;0]; %goal  
@@ -22,6 +22,14 @@ classdef Unicycle2D
            p4;         % plot whole trajectory
            Xt = [];
            
+           observed_data = [];
+           input_data = [];
+           predicted_data = [];
+           predicted_std = [];
+           predicted_normal_data = [];
+           predicted_normal_std = [];
+           inputs = [];
+           
            
         end
         
@@ -35,6 +43,7 @@ classdef Unicycle2D
                
                 quad.X(1) = x;
                 quad.X(2) = y;
+                quad.X(3) = yaw;
                 quad.yaw = yaw;
                 quad.safe_dist = r_safe;
                 quad.id=ID;                
@@ -49,6 +58,7 @@ classdef Unicycle2D
                 quad.g = [cos(yaw) 0;
                          sin(yaw) 0;
                          0 1];
+                     
             end
             
             function d = plot_update(d)
@@ -104,12 +114,13 @@ classdef Unicycle2D
                 
                 % Euler update with Dynamics
                 
-                d.X = d.X + [ U(1)*cos(d.yaw);U(1)*sin(d.yaw) ]*dt;
-                d.yaw = d.yaw + U(2)*dt;
-                d.yaw = wrap_pi(d.yaw);
+                d.X = d.X + [ U(1)*cos(d.X(3));U(1)*sin(d.X(3)); U(2)]*dt;
+%                 cur_sigma = cur_sigma + U(2)*dt;
+                d.X(3) = wrap_pi(d.X(3));
+                d.yaw = d.X(3);
                 
-                d.g =[cos(d.yaw) 0;
-                     sin(d.yaw) 0;
+                d.g =[cos(d.X(3)) 0;
+                     sin(d.X(3)) 0;
                      0 1];
                 
                 d = plot_update(d);
@@ -120,17 +131,17 @@ classdef Unicycle2D
                 
                 global d_min
                 %barrier
-                h = d_min^2 - norm(d.X-agent.X)^2;
-                dh_dxi = [-2*(d.X-agent.X)' 0];    % 0 because robot state is x,y,theta
-                dh_dxj = [2*(d.X-agent.X)' 0];                
+                h = d_min^2 - norm(d.X(1:2)-agent.X(1:2))^2;
+                dh_dxi = [-2*(d.X(1:2)-agent.X(1:2))' 0];    % 0 because robot state is x,y,theta
+                dh_dxj = [2*(d.X(1:2)-agent.X(1:2))' 0];                
                 
             end
             
             function [V, dV_dx] = goal_lyapunov(d)
                
                 % Lyapunov
-                V = norm(d.X-d.G)^2;
-                dV_dx = [2*(d.X-d.G)' 0];  % 0 because robot state is x,y,theta
+                V = norm(d.X(1:2)-d.G)^2;
+                dV_dx = [2*(d.X(1:2)-d.G)' 0];  % 0 because robot state is x,y,theta
                 
             end
             
@@ -141,7 +152,7 @@ classdef Unicycle2D
 %                     dh_dxi = [-2*(robot(i).X-Obstacle(j).X)' 0];
 
                     % this is a very unique barrier function for Unicycle only                    
-                    x1 = d.X(1); x2 = d.X(2); yaw = d.yaw; rho = Obs.length;
+                    x1 = d.X(1); x2 = d.X(2); yaw = d.X(3); rho = Obs.length;
                     Ox1 = Obs.X(1); Ox2 = Obs.X(2);
                     
                     % Joseph's barrier function for Unicycle
@@ -151,15 +162,13 @@ classdef Unicycle2D
                     dh_dx = [ (-(x1-Ox1) + wrap_pi(yaw-sigma*atan2(x2-Ox2,x1-Ox1))*sigma*(x2-Ox2)/((x1-Ox1)^2+(x2-Ox2)^2)  )/(rho-h)  ( -(x2-Ox2) - wrap_pi( yaw - sigma*atan2( x2-Ox2,x1-Ox1 ) )*sigma*(x1-Ox1)/((x1-Ox1)^2+(x2-Ox2)^2)  )/(rho-h) wrap_pi(yaw-sigma*atan2((x2-Ox2),(x1-Ox1)))/(rho-h)];           
             end
             
-            
-            
-            
+                  
             function uni_input = nominal_controller(d,u_min,u_max)
                 
-                dx = d.X - d.G;
+                dx = d.X(1:2) - d.G;
                 kw = 0.5*u_max(2)/pi;
                 phi_des = atan2( -dx(2),-dx(1) );
-                delta_phi = wrap_pi( phi_des - d.yaw );
+                delta_phi = wrap_pi( phi_des - d.X(3) );
 
                 w0 = kw*delta_phi;
                 kv = 1.0;%0.1;
@@ -168,8 +177,7 @@ classdef Unicycle2D
                 uni_input = [v0;w0];      
                 
             end
-            
-            
+           
             
         end
 
