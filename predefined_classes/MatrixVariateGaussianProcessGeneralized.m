@@ -251,7 +251,7 @@ classdef MatrixVariateGaussianProcessGeneralized <handle
             K_obs = zeros(N,N);
             for i =1:1:N
                 for j = 1:1:N
-                    cov = obj.evaluate_kernel(obj.Xs(i,:),obj.Xs(j,:));
+                    cov = obj.evaluate_kernel_i_j(obj.Xs(i,:),obj.Xs(j,:));
                     if i==j
                         K_obs(i,i) = cov + 0.2*obj.noise;
                     else
@@ -315,7 +315,7 @@ classdef MatrixVariateGaussianProcessGeneralized <handle
             A = Kinv * obj.Ys * omegainv * obj.Ys';          
             L = (n*d/2)*log(2*pi) + (d/2)*log(det(K)) + (n/2)*log(det(obj.omega)) + (1/2)*trace(A); 
             
-            dL_dparam = zeros(size(Kparams,3));
+            dL_dparam = zeros(1,size(Kparams,3));
             for i=1:size(Kparams,3)
                dL_dparam(i) =  (d/2)*trace(Kinv * Kparams(:,:,i)) + (1/2)*trace(-Kinv * Kparams(:,:,i) * A);
             end
@@ -328,12 +328,11 @@ classdef MatrixVariateGaussianProcessGeneralized <handle
                 obj.resample(floor(4*Ns/5))
                 K = obj.get_covariance();
                 Kparams = obj.get_dK();
-                Kparams = [Kparams(1,:) Kparams(2,:)];
                 Kinv = inv(K);
                 omegainv = inv(obj.omega);
                 A = inv(K) * obj.Ys * inv(obj.omega) * obj.Ys';
                 L = (n*d/2)*log(2*pi) + (d/2)*log(det(K)) + (n/2)*log(det(obj.omega)) + (1/2)*trace(A);
-                for i=1:max(size(Kparams))
+                for i=1:size(Kparams,3)
                    dL_dparam(i) =  (d/2)*trace(Kinv * Kparams(:,:,i)) + (1/2)*trace(-Kinv * Kparams(:,:,i) * A);
                 end
                 dL_domega = (n/2) * omegainv' - (1/2)*(omegainv' * obj.Ys' * Kinv' * obj.Ys * omegainv' );
