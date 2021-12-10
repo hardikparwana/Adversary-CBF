@@ -31,11 +31,10 @@ gp_org.resample(N);
 
 %% GP with training train
 gp = MatrixVariateGaussianProcessGeneralized(Omega,[sigma;l], 2, 2);
-% gp.set_XY(X,y);
-% gp.resample(N);
-% 
-% max_iter = 10;
-% gp.fit(max_iter,1);
+gp.set_XY(X,y);
+gp.resample(N);
+max_iter = 30;
+gp.fit(max_iter,1);
 % 
 % disp("MultiVariate GP")
 % disp("New Parameters: ")
@@ -75,6 +74,11 @@ function plot_results(N,X,y,gp_org,gp,index)
         mean = mean*[X(i,3);X(i,4)];
         cov = cov * omega * ([X(i,3) X(i,4)]*[X(i,3);X(i,4)]);
         y_org(i,:) = [mean(index), factor_org*sqrt(cov(index,index))];
+        
+        [mean, cov, omega] = gp.predict(X(i,:));
+        mean = mean*[X(i,3);X(i,4)];
+        cov = cov * omega * ([X(i,3) X(i,4)]*[X(i,3);X(i,4)]);
+        y_train(i,:) = [mean(index), factor_org*sqrt(cov(index,index))];
 %         [mean, cov] = gp.predict(X(i,:));
 %         y_train(i,:) = [mean(index), mean(index)+factor_train*cov(index,index), mean(index)-factor_train*cov(index,index)];
     end
@@ -82,6 +86,7 @@ function plot_results(N,X,y,gp_org,gp,index)
 %     plot(counter, y_org(:,1),'r')
 %     plot(X,y_train(:,1),'g')
     errorbar(counter, y_org(:,1),y_org(:,2),'--ko')
+    errorbar(counter, y_train(:,1),y_train(:,2),'--bo')
 %     patch([X;flipud(X)],[y_org(:,2);flipud(y_org(:,3))],'m','FaceAlpha',0.1); 
 %     patch([X;flipud(X)],[y_train(:,2);flipud(y_train(:,3))],'b','FaceAlpha',0.1); 
     
