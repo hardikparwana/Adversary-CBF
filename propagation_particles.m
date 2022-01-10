@@ -144,45 +144,55 @@ gp3 = fitrgp( robot.input_data', robot.observed_data(3,:)');
 
 figure(2)
 hold on
+[mu, ~, cov] = predict( gp1,robot.input_data' );  
+std2 = ( cov(:,2) - cov(:,1) )/2.0;
+indexes = 1:1:size(robot.input_data,2);
+errorbar( indexes, mu,std2,'--ko' ); %errorbar( i, mean(1),2*sqrt(cov(1,1)),'--ko' )
+scatter( indexes, robot.observed_data(1,:) )
 
 figure(3)
 hold on
-
-figure(4)
-hold on
-
-for i=1:1:size(robot.input_data,2)
-   
-    [mu, ~, cov] = predict( gp1,robot.input_data(:,i)' );    
-    std2 = ( cov(2) - cov(1) )/2.0;
-    obs = robot.observed_data(1,i);    
-    figure(2)
-    errorbar( i, mu(1),std2,'--ko' ); %errorbar( i, mean(1),2*sqrt(cov(1,1)),'--ko' )
-    scatter( i, obs )
-    
-    [mu, ~, cov] = predict( gp2,robot.input_data(:,i)' );   
-    std2 = ( cov(2) - cov(1) )/2.0;
-    obs = robot.observed_data(2,i);    
-    figure(3)
-    errorbar( i, mu(1),std2,'--ko' );
-    scatter( i, obs )
-    
-    [mu, ~, cov] = predict( gp3,robot.input_data(:,i)' );   
-    std2 = ( cov(2) - cov(1) )/2.0;
-    obs = robot.observed_data(3,i);    
-    figure(4)
-    errorbar( i, mu(1),std2,'--ko' );
-    scatter( i, obs )
-    
-end
-
 [mu, ~, cov] = predict( gp2,robot.input_data' );  
 std2 = ( cov(:,2) - cov(:,1) )/2.0;
-figure(11)
-hold on
 indexes = 1:1:size(robot.input_data,2);
 errorbar( indexes, mu,std2,'--ko' ); %errorbar( i, mean(1),2*sqrt(cov(1,1)),'--ko' )
 scatter( indexes, robot.observed_data(2,:) )
+
+figure(4)
+hold on
+[mu, ~, cov] = predict( gp3,robot.input_data' );  
+std2 = ( cov(:,2) - cov(:,1) )/2.0;
+indexes = 1:1:size(robot.input_data,2);
+errorbar( indexes, mu,std2,'--ko' ); %errorbar( i, mean(1),2*sqrt(cov(1,1)),'--ko' )
+scatter( indexes, robot.observed_data(3,:) )
+
+% for i=1:1:size(robot.input_data,2)
+%    
+%     [mu, ~, cov] = predict( gp1,robot.input_data(:,i)' );    
+%     std2 = ( cov(2) - cov(1) )/2.0;
+%     obs = robot.observed_data(1,i);    
+%     figure(2)
+%     errorbar( i, mu(1),std2,'--ko' ); %errorbar( i, mean(1),2*sqrt(cov(1,1)),'--ko' )
+%     scatter( i, obs )
+%     
+%     [mu, ~, cov] = predict( gp2,robot.input_data(:,i)' );   
+%     std2 = ( cov(2) - cov(1) )/2.0;
+%     obs = robot.observed_data(2,i);    
+%     figure(3)
+%     errorbar( i, mu(1),std2,'--ko' );
+%     scatter( i, obs )
+%     
+%     [mu, ~, cov] = predict( gp3,robot.input_data(:,i)' );   
+%     std2 = ( cov(2) - cov(1) )/2.0;
+%     obs = robot.observed_data(3,i);    
+%     figure(4)
+%     errorbar( i, mu(1),std2,'--ko' );
+%     scatter( i, obs )
+%     
+% end
+
+
+
 % 
 % for i=1:1:size(robot.input_data,2)
 %    
