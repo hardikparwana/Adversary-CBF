@@ -26,7 +26,7 @@ classdef SingleIntegrator2D <handle
        function d = plot_update(d)
            
            if d.iter<1
-               d.p1 = scatter(d.X(1),d.X(2),50,color,'filled');
+               d.p1 = scatter(d.X(1),d.X(2),50,'r','filled');
                d.iter = 1;
            else
                set(d.p1,'XData',d.X(1),'YData',d.X(2));

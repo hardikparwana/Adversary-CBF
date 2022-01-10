@@ -72,7 +72,8 @@ function plot_results(N,X,y,gp_org,gp,index)
     for i=1:1:N
         [mean, cov, omega] = gp_org.predict(X(i,:));
         mean = mean*[X(i,3);X(i,4)];
-        cov = cov * omega * ([X(i,3) X(i,4)]*[X(i,3);X(i,4)]);
+        cov = ([X(i,3) X(i,4)] * cov * [X(i,3);X(i,4)]) * omega;
+%         cov = cov * omega * ([X(i,3) X(i,4)]*[X(i,3);X(i,4)]);
         y_org(i,:) = [mean(index), factor_org*sqrt(cov(index,index))];
         
         [mean, cov, omega] = gp.predict(X(i,:));

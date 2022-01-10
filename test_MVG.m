@@ -32,7 +32,7 @@ gp = MatrixVariateGaussianProcess(Omega,sigma,l);
 gp.set_XY(X,y);
 gp.resample(N);
 
-max_iter = 10;
+max_iter = 30;
 gp.fit(max_iter,1);
 
 disp("MultiVariate GP")
