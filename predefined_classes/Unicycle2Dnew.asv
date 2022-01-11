@@ -140,11 +140,11 @@ classdef Unicycle2Dnew <handle
             
             end
             
-            function out = control_state_fgx(d,fgxU,dt)
+            function out = control_state_fgx(d,U,dt)
                 
                 % Euler update with Dynamics
                 
-                d.X = d.X + fgxU*dt;
+                d.X = d.X + fgx*dt;
 %                 cur_sigma = cur_sigma + U(2)*dt;
                 d.X(3) = wrap_pi(d.X(3));
                 d.yaw = d.X(3);
@@ -153,7 +153,7 @@ classdef Unicycle2Dnew <handle
                      sin(d.X(3)) 0;
                      0 1];
                 
-%                 d = plot_update(d);
+                d = plot_update(d);
                 out = d.X;
             
             end
