@@ -203,7 +203,7 @@ scatter( indexes, robot.observed_data(3,:),[],c )
 num_particles = 500;
 T = 100;
 
-simulate_particles(robot,robot_gp,robot_kalman,leader,t_prev,robot_x_prev,leader_x_prev,num_particles,dim_state,T,u_min,u_max,v_max,gp1,gp2,gp3);
+simulate_particles(robot,robot_gp,leader,t_prev,robot_x_prev,leader_x_prev,num_particles,dim_state,T,u_min,u_max,v_max,gp1,gp2,gp3);
 
 
 % f2 = figure();
@@ -213,7 +213,7 @@ function out = simulate_particles(robot,robot_gp,leader,t_prev,robot_x_prev,lead
 
     robot.X = robot_x_prev;
     robot_gp.X = robot_x_prev;
-    robot.kalman.X = robot_x_prev;
+%     robot.kalman.X = robot_x_prev;
     leader.X = leader_x_prev;
  
     % Monte Carlo
@@ -336,14 +336,14 @@ function out = simulate_particles(robot,robot_gp,leader,t_prev,robot_x_prev,lead
        robot_gp.control_state_fgx([mu1;mu2;mu3],dt);
        
        % Kalman Robot
-       A = [0 0 -u(1)*sin(robot_kalman.X(3));
-           0 0 u(1)*cos(robot_kalman.X(3));
-           0 0 0]*dt + eye(3);
-       B = [cos(robot_kalman.X(3)) 0;
-           sin(robot_kalman.X(3)) 0;
-           0 1]*dt; 
+%        A = [0 0 -u(1)*sin(robot_kalman.X(3));
+%            0 0 u(1)*cos(robot_kalman.X(3));
+%            0 0 0]*dt + eye(3);
+%        B = [cos(robot_kalman.X(3)) 0;
+%            sin(robot_kalman.X(3)) 0;
+%            0 1]*dt; 
        
-       robot.Kalman
+%        robot.Kalman
 
        if mod(t_index,10)==0
           figure(1)
@@ -366,7 +366,7 @@ function out = simulate_particles(robot,robot_gp,leader,t_prev,robot_x_prev,lead
 
           % Propagated Gaussian
           
-          pause(0.5)
+%           pause(0.5)
        end
 
 
