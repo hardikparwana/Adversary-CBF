@@ -21,6 +21,7 @@ classdef Unicycle2D
            p3; % only for leader
            p4;         % plot whole trajectory
            Xt = [];
+           color_force = 0;
            
            observed_data = [];
            input_data = [];
@@ -29,6 +30,22 @@ classdef Unicycle2D
            predicted_normal_data = [];
            predicted_normal_std = [];
            inputs = [];
+           
+           gp_x;
+           gp_y;
+           gp_psi;
+           
+           % STL monitors
+           sum_h = [0];
+           h = [0];
+           V = [0];
+           upper_bound = [0]
+           dh_dx = [0 0 0];
+           dV_dx = [0 0 0];
+           inner_prod = [0];
+           dh_dx_complete = [0 0 0 0 0 0];
+           dV_dx_complete = [0 0 0 0 0 0];
+           inner_prod_complete = [0];
            
            
         end
@@ -94,7 +111,11 @@ classdef Unicycle2D
                 else
                     
                     set(d.p1,'XData',d.X(1),'YData',d.X(2));
-                    set(d.p4,'XData',d.Xt(:,1),'YData',d.Xt(:,2));
+                    if (d.color_force==0)
+                        set(d.p4,'XData',d.Xt(:,1),'YData',d.Xt(:,2));
+                    else
+                        set(d.p4,'XData',d.Xt(:,1),'YData',d.Xt(:,2),'g');
+                    end
                     delete(d.p2);
                     delete(d.p3);
                     
@@ -156,7 +177,7 @@ classdef Unicycle2D
                     Ox1 = Obs.X(1); Ox2 = Obs.X(2);
                     
                     % Joseph's barrier function for Unicycle
-                    sigma = 1.0;
+                    sigma = 1.0; %1.0;
                     h = rho - sqrt( norm([x1;x2]-[Ox1;Ox2] )^2 - wrap_pi( yaw - sigma*atan2(x2-Ox2,x1-Ox1) )^2   );
 %                     dh_dx = [  ( -2*(x1-Ox1) + sigma*(x2-Ox2)/( (x1-Ox1)^2 + (x2-Ox2)^2 ) )/2/(rho-h)  ( -2*(x2-Ox2) - sigma*(x1-Ox1)/( (x1-Ox1)^2 + (x2-Ox2)^2 ) )/2/(rho-h) ( 1/(rho-h) )    ];
                     dh_dx = [ (-(x1-Ox1) + wrap_pi(yaw-sigma*atan2(x2-Ox2,x1-Ox1))*sigma*(x2-Ox2)/((x1-Ox1)^2+(x2-Ox2)^2)  )/(rho-h)  ( -(x2-Ox2) - wrap_pi( yaw - sigma*atan2( x2-Ox2,x1-Ox1 ) )*sigma*(x1-Ox1)/((x1-Ox1)^2+(x2-Ox2)^2)  )/(rho-h) wrap_pi(yaw-sigma*atan2((x2-Ox2),(x1-Ox1)))/(rho-h)];           

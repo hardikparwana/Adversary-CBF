@@ -1,4 +1,4 @@
-classdef SingleIntegrator2D %<handle
+classdef DoubleIntegrator2D %<handle
     
    properties(Access = public)
       
@@ -10,8 +10,11 @@ classdef SingleIntegrator2D %<handle
        colors = ['r','k','m'];
        
        % Dynamcs matrices for x_dot = f(x) + g(x)u 
-       f = [0;0];
-       g = [1 0;0 1];
+       f = [0 0 1 0;
+           0 0 0 1;
+           0 0 0 0;
+           0 0 0 0];
+       g = [0 0;0 0;1 0;0 1];
        
        observed_data = [];
        input_data = [];
@@ -38,17 +41,6 @@ classdef SingleIntegrator2D %<handle
        dh_dx_complete = [0 0 0 0];
        dV_dx_complete = [0 0 0 0];
        inner_prod_complete = [0];
-       
-       obs_1_h = [0];
-       obs_2_h = [0];
-       obs_1_upper_bound = [0];
-       obs_2_upper_bound = [0];
-       obs_1_sum_h = [0];
-       obs_2_sum_h = [0];
-       obs_1_dh_dx = [0 0];
-       obs_2_dh_dx = [0 0];
-       obs_1_inner_prod = [0];
-       obs_2_inner_prod = [0];
    end
    
    properties(Access = private)
@@ -59,10 +51,10 @@ classdef SingleIntegrator2D %<handle
    
    methods(Access = public)
       
-       function robot = SingleIntegrator2D(ID,x,y)
+       function robot = DoubleIntegrator2D(ID,x,y,vx,vy)
           
            
-           robot.X = [x;y];
+           robot.X = [x;y;vx;vy];
            robot.id = ID;
            robot = plot_update(robot);            
        end
@@ -93,38 +85,47 @@ classdef SingleIntegrator2D %<handle
        function d = control_state(d,U,dt)
                 
                 % Euler update with Dynamics                
-                d.X = d.X + [ U(1); U(2)]*dt;
+                d.X = d.X + d.f * d.X + d.g * [ U(1); U(2)]*dt;
                 d = plot_update(d);
 %                 out = d.X;
                 
-                d.f = [0;0];
-                d.g = [1 0;0 1];
+                d.f = [0 0 1 0;
+                       0 0 0 1;
+                       0 0 0 0;
+                       0 0 0 0];
+                d.g = [0 0;0 0;1 0;0 1];
             
        end
         
-       function [h, dh_dxi, dh_dxj] = agent_barrier(d,agent)
+       function [h, h_dot_i, h_dot_j, h_ddot, h_ddot_i, h_ddot_j] = agent_barrier(d,agent)
                 
                 global d_min
                 %barrier
-                h = d_min^2 - norm(d.X(1:2)-agent.X(1:2))^2;
-                dh_dxi = [-2*(d.X(1:2)-agent.X(1:2))'];    % 0 because robot state is x,y,theta
-                dh_dxj = [2*(d.X(1:2)-agent.X(1:2))'];                
-                
+                h = d_min^2 - norm(d.X(1:2)-agent.X(1:2))^2;                
+                h_dot_i = -2*( d.X(1:2) - agent.X(1:2) )' * ( d.X(3:4) );
+                h_dot_j = -2*( d.X(1:2) - agent.X(1:2) )' * (- agent.X(3:4) );
+                h_ddot = -2*( d.X(3:4) - agent.X(3:4) )' * ( d.X(3:4) - agent.X(3:4) );
+                h_ddot_i = -2*( d.X(1:2) - agent.X(1:2) )';
+                h_ddot_j = 2*( d.X(1:2) - agent.X(1:2) )';                
        end
        
-       function [V, dV_dx] = goal_lyapunov(d)
-               
+       function [V, dV_dx, dV_dx_i] = goal_lyapunov(d)
+               %V = (x-x_d)^2 + v^Tv
                 % Lyapunov
-                V = norm(d.X(1:2)-d.G)^2;
-                dV_dx = [2*(d.X(1:2)-d.G)'];  % 0 because robot state is x,y,theta
+                V = norm(d.X(1:2)-d.G)^2 + norm(d.X(3:4))^2;
+                dV_dx = 2*(d.X(1:2)-d.G)'*d.X(3:4);  % 0 because robot state is x,y,theta
+                dV_dx_i = 2*d.X(3:4)';
                 
        end
        
-       function [h, dh_dx] = obstacle_barrier(d,Obs)
+       function [h, h_dot_i, h_ddot, h_ddot_i] = obstacle_barrier(d,Obs)
                              
                 % Simple barrier function: DOES NOT work for Unicycle
-                h = (Obs.length)^2 - norm(d.X-Obs.X)^2;
-                dh_dx = [-2*(d.X-Obs.X)'];
+                h = (Obs.length)^2 - norm(d.X(1:2)-Obs.X)^2;
+                
+                h_dot_i = -2*( d.X(1:2) - Obs.X(1:2) )' * ( d.X(3:4) );
+                h_ddot = -2*( d.X(3:4) )' * ( d.X(3:4) );
+                h_ddot_i = -2*( d.X(1:2) - Obs.X(1:2) )';
        end
        
        
