@@ -9,21 +9,21 @@ classdef EnvObject2D
    methods(Access = public)
        
        %Constructor
-       function Obs = EnvObject2D(x,y,shape,lx,ly)  
+       function Obs = EnvObject2D(x,y,shape,texture,lx,ly)  
                Obs.X = [x;y];
                Obs.type = shape; % circle, rectangle
                Obs.length = lx;
                Obs.width = ly;
                if strcmp(Obs.type,'circle')
-                   make_circle(Obs);
+                   make_circle(Obs,texture);
                elseif strcmp(Obs.type,'rectangle')
-                   make_rectangle(Obs);
+                   make_rectangle(Obs,texture);
                end
        end
        
-       function make_circle(d)
-               figure(1)
-               hold on               
+       function make_circle(d,texture)
+%                figure(1)
+%                hold on               
                center = [d.X(1) d.X(2)];
                radius = d.length;
                
@@ -34,7 +34,7 @@ classdef EnvObject2D
                fill(xd, yd, 'k');
        end
            
-       function make_rectangle(d)
+       function make_rectangle(d,texture)
               cx = d.X(1);
               cy = d.X(2);
 
@@ -44,9 +44,9 @@ classdef EnvObject2D
               x = [cx+lx/2 cx-lx/2 cx-lx/2 cx+lx/2];
               y = [cy+ly/2 cy+ly/2 cy-ly/2 cy-ly/2];
 
-              figure(1)
-              hold on  
-              patch( x,y,[0 0 0] );
+%               figure(1)
+%               hold on  
+              patch( x,y,[0 0 0],'FaceColor',texture );
        end
        
    end
