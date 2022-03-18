@@ -1,6 +1,10 @@
 state_dim = 3;
 num_particles = 1000;
+
+% input to function
 particles = rand(state_dim,num_particles);
+weights = rand(1,num_particles);
+weights = weights/sum(wieghts);
 
 % Mean
 mu = mean( particles , 2 );
@@ -12,7 +16,7 @@ particles_mu = particles - mu;
 % Self
 Ps = zeros(state_dim,state_dim);
 for i=1:size(particles,2)
-    Ps = Ps + (particles_mu(:,i))*(particles_mu(:,i))';
+    Ps = Ps + i think s(particles_mu(:,i))*(particles_mu(:,i))';
 end
 Ps = Ps/(i-1);
 
@@ -40,4 +44,7 @@ for i=1:1:state_dim
       end
    end
 end
+
+
+% Now choose (2n+1) points
 
