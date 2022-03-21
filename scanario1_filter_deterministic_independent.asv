@@ -2,7 +2,7 @@ clear all;
 close all;
 
 warning('off');
-num = 0;
+num = 2;
 % Display
 figure(1+num)
 hold on
@@ -37,9 +37,9 @@ tf = 6.0;
 alpha_cbf = 0.8;%1.0;
 
 % Record Video
-myVideo = VideoWriter('trust_cbf'); %open video file
-myVideo.FrameRate = 10;  %can adjust this, 5 - 10 works well for me
-open(myVideo)
+% myVideo = VideoWriter('always_cbf'); %open video file
+% myVideo.FrameRate = 10;  %can adjust this, 5 - 10 works well for me
+% open(myVideo)
 
 % Nominal simulation
 % for t=0:dt:tf
@@ -90,9 +90,9 @@ for t=0:dt:tf
 %             subject to
 %                 dV_dx * u <= -k*V;%+ k * V_max;
 %        cvx_end
-      
-       u_nominal = -k*V*dV_dx'/norm(dV_dx); % Exponentially stable controller
-       robot(i).trust_factor(end+1) = robot(i).contri(end)/robot(i).contri(1);
+       
+       u_nominal = -k*V*dV_dx'/norm(dV_dx);
+       trust_factor
        
        if 1%contribution>0 % uncooperative
           robot(i).trust_humans = 0;  
@@ -103,8 +103,7 @@ for t=0:dt:tf
 %             minimize( norm(u-u_robot) ); 
             minimize( 1.01*norm(u-u_nominal) )% + 100*norm(delta) ); 
             subject to
-                robot(i).trust_factor(end)*dh_dxi*( robot(i).f + robot(i).g*u) + dh_dxj*( human(1).f + human(1).g*u_human ) <= -alpha_cbf * h;
-%                 dh_dxi*( robot(i).f + robot(i).g*u) + dh_dxj*( human(1).f + human(1).g*u_human ) <= -1.0/robot(i).trust_factor(end) * alpha_cbf * h;
+                dh_dxi*( robot(i).f + robot(i).g*u) + dh_dxj*( human(1).f + human(1).g*u_human ) <= -alpha_cbf * h;
 %                 dV_dx * u <= -k*V + delta ;%+ k * V_max;
           cvx_end
        else
@@ -118,8 +117,8 @@ for t=0:dt:tf
         robot(i) = control_state(robot(i),u,dt);
         robot(i).inputs(:,end+1) = u;
         
-        frame = getframe(gcf); %get frame
-        writeVideo(myVideo, frame);
+%         frame = getframe(gcf); %get frame
+%         writeVideo(myVideo, frame);
         
    end
    
@@ -127,7 +126,7 @@ for t=0:dt:tf
     
 end
 
-close(myVideo)
+% close(myVideo)
 
 figure(2+num)
 hold on
@@ -141,12 +140,5 @@ hold on
 plot(robot(1).contri,'r')
 plot(robot(2).contri,'g')
 plot(robot(3).contri,'k')
-legend('1','2','3')
-
-figure(4+num)
-hold on
-plot(robot(1).trust_factor,'r')
-plot(robot(2).trust_factor,'g')
-plot(robot(3).trust_factor,'k')
 legend('1','2','3')
 

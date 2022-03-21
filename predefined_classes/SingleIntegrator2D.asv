@@ -19,7 +19,7 @@ classdef SingleIntegrator2D %<handle
        predicted_std = [];
        predicted_normal_data = [];
        predicted_normal_std = [];
-       inputs = [];
+       inputs = [0;0];
 
        gp_x;
        gp_y;
@@ -27,6 +27,8 @@ classdef SingleIntegrator2D %<handle
        %plots
        color_force = 0;
        status = '';
+       
+       %input history
        
        % STL monitors
        sum_h = [0];
@@ -53,6 +55,7 @@ classdef SingleIntegrator2D %<handle
        
        trust_robots = [];
        trust_humans = [];
+       contri = [0];
    end
    
    properties(Access = private)
@@ -100,9 +103,9 @@ classdef SingleIntegrator2D %<handle
            if d.iter<1
                if strcmp(d.status,'human')
                     d.p1 = scatter(d.X(1),d.X(2),50,'r','filled');
-               elseif strcmp(d.status'reactive')
+               elseif strcmp(d.status,'reactive')
                    d.p1 = scatter(d.X(1),d.X(2),50,'g','filled');
-               elseif (d.status=='nominal')
+               elseif strcmp(d.status,'nominal')
                    d.p1 = scatter(d.X(1),d.X(2),50,'b','filled');
                end
                d.p2 = plot( d.Xt(:,1),d.Xt(:,2) );

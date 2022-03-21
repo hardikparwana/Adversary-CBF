@@ -59,6 +59,7 @@ open(myVideo)
 % end
 % keyboard
 % Safety Critical un-cooperative behaviour
+
 for t=0:dt:tf
     
    % Human movement: straight line. Therefore uncooperative
