@@ -19,7 +19,7 @@ classdef SingleIntegrator2D %<handle
        predicted_std = [];
        predicted_normal_data = [];
        predicted_normal_std = [];
-       inputs = [0;0];
+       inputs = [0;0.1];
 
        gp_x;
        gp_y;
@@ -53,8 +53,14 @@ classdef SingleIntegrator2D %<handle
        obs_1_inner_prod = [0];
        obs_2_inner_prod = [0];
        
-       trust_robots = [];
-       trust_humans = [];
+       trust_robot = [];
+       trust_human = [];
+       contri = [];
+       trust_factor = [];
+       human_alpha = [0.8];
+       robot_alpha = [0.8 0.8];
+       robot_alphas = []
+       human_alphas = [];
    end
    
    properties(Access = private)
