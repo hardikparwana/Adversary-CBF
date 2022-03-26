@@ -68,6 +68,7 @@ for t=0:dt:tf
     % Human movement: straight line. Therefore uncooperative
     u_human = [1.0;0.0];
     human_nominal(1) = control_state(human_nominal(1),u_human,dt);
+%     u_human_nominal = u_human;
 %     u_human = [0.8;-0.5];
 
     % Human believed movement
@@ -77,6 +78,7 @@ for t=0:dt:tf
     % Human actual movement
     [V, dV_dx] = lyapunov(human,robot(1).X);
     u_human = -1.0*dV_dx'/norm(dV_dx);   
+%     u_human = [0.8;-0.5];
     human(1) = control_state(human(1),u_human,dt);   
 
     % Open Loop Robots:
@@ -96,24 +98,34 @@ for t=0:dt:tf
            [V, dV_dx] = lyapunov(robot(i),robot_nominal(i).X);
            V_max = 0.2; k = 2.0;
            u_nominal(:,i) = -k*V*dV_dx'/norm(dV_dx); % Exponentially stable controller  
+           
+           % Calculate best case input
+           
+%            % Human
+%            cvx_begin
+%                 variable u(2,1)
+%                 subject to
+%                     
+%                 
+%            % Robot 1
+%            
+%            
+%            % Robot 2
+           
+           
             
         end
    
         for i=1:1:num_robots
             
-            disp("start")
+            disp("start")   
 
-           % Human CBF constraint
+           %%%%%%%%%%%%%%%%% Human CBF constraint
            [h, dh_dxi, dh_dxj] = agent_barrier(robot(i),human(1));
-           A = dh_dxj; b = -robot(i).human_alpha * h - dh_dxi*robot(i).inputs(:,end); rho_dist = b - A*u_human - min_dist
-           rho_dist = tanh(rho_dist);
-           theta_as = real(acos( -A*u_human/norm(A)/norm(u_human) ));
-           theta_ns = real(acos( -A*u_human_nominal/norm(A)/norm(u_human_nominal) )); 
-           if (theta_ns<0.05)
-               theta_ns = 0.05;
-           end
-           rho_theta = -1 + 2*tanh(theta_ns/theta_as);           
-           robot(i).trust_human = rho_dist * rho_theta;
+           A = dh_dxj; b = -robot(i).human_alpha * h - dh_dxi*robot(i).inputs(:,end); 
+                             
+           robot(i).trust_human = compute_trust(A,b,u_human,u_human_nominal,h,min_dist);      
+           fprintf("robot: %d trust for human = %f \n", i, robot(i).trust_human);
            
            robot(i).human_alpha = robot(i).human_alpha + alpha_der_max*robot(i).trust_human;
            if (robot(i).human_alpha<0)
@@ -121,54 +133,39 @@ for t=0:dt:tf
            end
            robot(i).human_alphas(end+1) = robot(i).human_alpha;
            dh_dxi*( robot(i).f + robot(i).g*u(:,i)) + dh_dxj*( human(1).f + human(1).g*u_human ) <= -robot(i).human_alpha * h; 
-           disp(robot(i).trust_human)
-%            disp(alpha_der_max*robot(i).trust_human)
                       
-           % 1st neighbor         
+           %%%%%%%%%%%%%%%%% 1st neighbor         
            index = mod(i,num_robots)+1;
            [h, dh_dxi, dh_dxj] = agent_barrier(robot(i),robot(index));
            
-           A = dh_dxj; b = -robot(i).robot_alpha(1) * h - dh_dxi*robot(i).inputs(:,end); rho_dist = b - A*robot(index).inputs(:,end);
-           rho_dist = tanh(rho_dist);
-           theta_as = real(acos( -A*robot(index).inputs(:,end)/norm(A)/norm(robot(index).inputs(:,end)) ));
-           theta_ns = real(acos( -A*u_nominal(:,index)/norm(A)/norm(u_nominal(:,index)) )); 
-           if (theta_ns<0.05)
-               theta_ns = 0.05;
-           end
-           rho_theta = -1 + 2*tanh(theta_ns/theta_as);          
-           robot(i).trust_robot(1) = rho_dist * rho_theta;
+           A = dh_dxj; b = -robot(i).robot_alpha(1) * h - dh_dxi*robot(i).inputs(:,end); 
+           
+           robot(i).trust_robot(1) = compute_trust(A,b,robot(index).inputs(:,end),u_nominal(:,index),h,min_dist);         
+           fprintf("robot: %d trust for robot %d = %f \n", i, index, robot(i).trust_robot(1));
            
            robot(i).robot_alpha(1) = robot(i).robot_alpha(1) + alpha_der_max*robot(i).trust_robot(1);
            if (robot(i).robot_alpha(1)<0)
                robot(i).robot_alpha(1)=0.01;
            end
            dh_dxi*( robot(i).f + robot(i).g*u(:,i)) + dh_dxj*( robot(index).f + robot(index).g*u(:,index) ) <= -robot(i).robot_alpha(1) * h; 
-%            disp(robot(i).trust_robot(1))
-%            disp(alpha_der_max*robot(i).trust_robot(1))
            
-           % 2nd neighbor         
+           %%%%%%%%%%%%%%%%%% 2nd neighbor         
            index = mod(i+1,num_robots)+1;
            [h, dh_dxi, dh_dxj] = agent_barrier(robot(i),robot(index));
-           A = dh_dxj; b = -robot(i).robot_alpha(1) * h - dh_dxi*robot(i).inputs(:,end); rho_dist = b - A*robot(index).inputs(:,end);
-           rho_dist = tanh(rho_dist);
-           theta_as = real(acos( -A*robot(index).inputs(:,end)/norm(A)/norm(robot(index).inputs(:,end)) ));
-           theta_ns = real(acos( -A*u_nominal(:,index)/norm(A)/norm(u_nominal(:,index)) )); 
-           if (theta_ns<0.05)
-               theta_ns = 0.05;
-           end
-           rho_theta = -1 + 2*tanh(theta_ns/theta_as);         
-           robot(i).trust_robot(2) = rho_dist * rho_theta;
+           A = dh_dxj; b = -robot(i).robot_alpha(1) * h - dh_dxi*robot(i).inputs(:,end); 
            
+           robot(i).trust_robot(2) = compute_trust(A,b,robot(index).inputs(:,end),u_nominal(:,index),h,min_dist);  
+           fprintf("robot: %d trust for robot %d = %f \n", i, index, robot(i).trust_robot(2));
+  
            robot(i).robot_alpha(2) = robot(i).robot_alpha(2) + alpha_der_max*robot(i).trust_robot(2);
            if (robot(i).robot_alpha(1)<0)
                robot(i).robot_alpha(1)=0.01;
            end
            dh_dxi*( robot(i).f + robot(i).g*u(:,i)) + dh_dxj*( robot(index).f + robot(index).g*u(:,index) ) <= -robot(i).robot_alpha(2) * h;    
-%            disp(robot(i).trust_robot(2))
-%            disp(alpha_der_max*robot(i).trust_robot(2))
            
+           
+           %%%%%%%%%%%%%%%%%% store alphas for plot
            robot(i).robot_alphas(:,end+1) = [robot(i).robot_alpha(1); robot(i).robot_alpha(2)];
-           
            
          end
    
