@@ -1,8 +1,9 @@
+ 
 clear all;
-close all;
+% close all;
 
 warning('off');
-num = 0;
+num = 5;
 % Display
 figure(1+num)
 hold on
@@ -34,13 +35,13 @@ human(1) = SingleIntegrator2D(1,0.0,4,'human');
 human_nominal(1) = SingleIntegrator2D(1,0.0,4,'human');
 
 dt = 0.05;
-tf = 6.0;
+tf = 7.0;
 alpha_cbf = 0.8;%1.0;
 
 % Record Video
-% myVideo = VideoWriter('trust_cbf'); %open video file
-% myVideo.FrameRate = 10;  %can adjust this, 5 - 10 works well for me
-% open(myVideo)
+myVideo = VideoWriter('constant_alpha_v1'); %open video file
+myVideo.FrameRate = 10;  %can adjust this, 5 - 10 works well for me
+open(myVideo)
 
 % Nominal simulation
 % for t=0:dt:tf
@@ -61,7 +62,7 @@ alpha_cbf = 0.8;%1.0;
 % keyboard
 % Safety Critical un-cooperative behaviour
 alpha_der_max = 0.5;%2.0;
-min_dist = 0.5;
+min_dist = 0.05; %0.5
 contri = [0];
 for t=0:dt:tf
     
@@ -115,7 +116,7 @@ for t=0:dt:tf
            rho_theta = -1 + 2*tanh(theta_ns/theta_as);           
            robot(i).trust_human = rho_dist * rho_theta;
            
-           robot(i).human_alpha = robot(i).human_alpha + alpha_der_max*robot(i).trust_human;
+%            robot(i).human_alpha = robot(i).human_alpha + alpha_der_max*robot(i).trust_human;
            if (robot(i).human_alpha<0)
                robot(i).human_alpha=0.01;
            end
@@ -138,7 +139,10 @@ for t=0:dt:tf
            rho_theta = -1 + 2*tanh(theta_ns/theta_as);          
            robot(i).trust_robot(1) = rho_dist * rho_theta;
            
-           robot(i).robot_alpha(1) = robot(i).robot_alpha(1) + alpha_der_max*robot(i).trust_robot(1);
+%            robot(i).robot_alpha(1) = robot(i).robot_alpha(1) + alpha_der_max*robot(i).trust_robot(1);
+           if (robot(i).robot_alpha(1)<0)
+               robot(i).robot_alpha(1)=0.01;
+           end
            dh_dxi*( robot(i).f + robot(i).g*u(:,i)) + dh_dxj*( robot(index).f + robot(index).g*u(:,index) ) <= -robot(i).robot_alpha(1) * h; 
 %            disp(robot(i).trust_robot(1))
 %            disp(alpha_der_max*robot(i).trust_robot(1))
@@ -156,7 +160,10 @@ for t=0:dt:tf
            rho_theta = -1 + 2*tanh(theta_ns/theta_as);         
            robot(i).trust_robot(2) = rho_dist * rho_theta;
            
-           robot(i).robot_alpha(2) = robot(i).robot_alpha(2) + alpha_der_max*robot(i).trust_robot(2);
+%            robot(i).robot_alpha(2) = robot(i).robot_alpha(2) + alpha_der_max*robot(i).trust_robot(2);
+           if (robot(i).robot_alpha(1)<0)
+               robot(i).robot_alpha(1)=0.01;
+           end
            dh_dxi*( robot(i).f + robot(i).g*u(:,i)) + dh_dxj*( robot(index).f + robot(index).g*u(:,index) ) <= -robot(i).robot_alpha(2) * h;    
 %            disp(robot(i).trust_robot(2))
 %            disp(alpha_der_max*robot(i).trust_robot(2))
@@ -180,14 +187,14 @@ for t=0:dt:tf
     robot(2) = control_state(robot(2),u(:,2),dt);
     robot(3) = control_state(robot(3),u(:,3),dt);
 
-%     frame = getframe(gcf); %get frame
-%     writeVideo(myVideo, frame);
+    frame = getframe(gcf); %get frame
+    writeVideo(myVideo, frame);
 %    
    pause(0.05)
     
 end
 
-% close(myVideo)
+close(myVideo)
 
 figure(2+num)
 hold on
@@ -210,4 +217,3 @@ plot(robot(1).trust_factor,'r')
 plot(robot(2).trust_factor,'g')
 plot(robot(3).trust_factor,'k')
 legend('1','2','3')
-

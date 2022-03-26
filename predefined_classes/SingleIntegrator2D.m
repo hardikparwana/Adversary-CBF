@@ -57,7 +57,7 @@ classdef SingleIntegrator2D %<handle
        trust_human = [];
        contri = [];
        trust_factor = [];
-       human_alpha = [0.8];
+       human_alpha = [1.2];
        robot_alpha = [0.8 0.8];
        robot_alphas = []
        human_alphas = [];
