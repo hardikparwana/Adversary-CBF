@@ -28,7 +28,6 @@ class SingleIntegrator2D:
         self.render_plot()
         
         # for Trust computation
-        alpha = 0.8
         self.adv_alpha = alpha*np.ones(num_adversaries)
         self.trust_adv = 1
         self.robot_alpha = alpha*np.ones(num_robots)
@@ -62,8 +61,8 @@ class SingleIntegrator2D:
         self.body.set_offsets([x[0],x[1]])
 
     def lyapunov(self, G):
-        V = np.linalg.norm( self.X - G )**2
-        dV_dx = 2*( self.X - G ).T
+        V = np.linalg.norm( self.X - G[0:2] )**2
+        dV_dx = 2*( self.X - G[0:2] ).T
         return V, dV_dx
     
     def agent_barrier(self,agent,d_min):

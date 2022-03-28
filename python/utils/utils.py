@@ -63,7 +63,10 @@ def compute_trust(A,b,uj,uj_nominal,h,min_dist,h_min):
     # distance
     rho_dist = b - A @ uj;
     assert(rho_dist>-0.01)
-
+    assert(h<0.01)
+    # assert(-1>0)
+    # if h>-h_min:
+    #     print(f"small h: {h}")
     rho_dist = np.tanh(rho_dist); # score between 0 and 1  
     
     # angle
@@ -82,16 +85,17 @@ def compute_trust(A,b,uj,uj_nominal,h,min_dist,h_min):
     
     if rho_dist<0:
         rho_dist = 0.01
-        print("WARNING: <0")
+        # print("WARNING: <0")
     
     # rho_dist and rho_theta both positive
-    
+    print(f"rho_dist:{rho_dist}, h:{h}, h_min:{h_min} ")
     if rho_dist>min_dist: # always positive
         trust = 2*rho_theta*(rho_dist-min_dist)
     else: # danger
         if h<-h_min:  # far away. therefore still relax/positive
             trust = 2*rho_theta*rho_dist 
         else:  # definitely negative this time
+            print("Negative Trust!")
             trust = -2*(1-rho_theta)*rho_theta
         
     

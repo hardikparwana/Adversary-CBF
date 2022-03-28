@@ -3,6 +3,7 @@ import time
 import cvxpy as cp
 import matplotlib.pyplot as plt
 from robot_models.SingleIntegrator2D import *
+from robot_models.Unicycle import *
 from utils.utils import *
 
 # Sim Parameters                  
@@ -10,17 +11,19 @@ dt = 0.05
 tf = 10
 num_steps = int(tf/dt)
 t = 0
-d_min = 0.1
-h_min = 0.5
+d_min = 1.0#0.1
 
-min_dist = 0.05
+h_min = 1.0##0.4   # more than this and do not decrease alpha
+min_dist = 0.1#0.05  # less than this and dercrease alpha
+cbf_extra_bad = 0.0
+
 alpha_cbf = 0.8
-alpha_der_max = 0.05#0.5
+alpha_der_max = 0.5
 
 # Plot                  
 plt.ion()
 fig = plt.figure()
-ax = plt.axes(xlim=(0,30),ylim=(-10,10))
+ax = plt.axes(xlim=(0,10),ylim=(-10,10))
 ax.set_xlabel("X")
 ax.set_ylabel("Y")
 ax.set_aspect(1)
@@ -28,16 +31,16 @@ ax.set_aspect(1)
 # agents
 robots = []
 num_robots = 3
-robots.append( SingleIntegrator2D(np.array([3,1]), dt, ax, num_robots=num_robots, id = 0, color='g',palpha=1.0, alpha=alpha_cbf ) )
-robots.append( SingleIntegrator2D(np.array([2.5,0]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=1.0, alpha=alpha_cbf ) )
-robots.append( SingleIntegrator2D(np.array([3.5,0]), dt, ax, num_robots=num_robots, id = 2, color='g',palpha=1.0, alpha=alpha_cbf ) )
+robots.append( Unicycle(np.array([3,1.5,np.pi/2]), dt, ax, num_robots=num_robots, id = 0, color='g',palpha=1.0, alpha=alpha_cbf ) )
+robots.append( Unicycle(np.array([2.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=1.0, alpha=alpha_cbf ) )
+robots.append( Unicycle(np.array([3.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 2, color='g',palpha=1.0, alpha=alpha_cbf ) )
 
 # agent nominal version
 robots_nominal = []
 num_robots = 3
-robots_nominal.append( SingleIntegrator2D(np.array([3,1]), dt, ax, num_robots=num_robots, id = 0, color='g',palpha=0.4) )
-robots_nominal.append( SingleIntegrator2D(np.array([2.5,0]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=0.4 ) )
-robots_nominal.append( SingleIntegrator2D(np.array([3.5,0]), dt, ax, num_robots=num_robots, id = 2, color='g',palpha=0.4 ) )
+robots_nominal.append( Unicycle(np.array([3,1.5,np.pi/2]), dt, ax, num_robots=num_robots, id = 0, color='g',palpha=0.4) )
+robots_nominal.append( Unicycle(np.array([2.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=0.4 ) )
+robots_nominal.append( Unicycle(np.array([3.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 2, color='g',palpha=0.4 ) )
 U_nominal = np.zeros((2,num_robots))
 
 # Uncooperative
@@ -73,12 +76,48 @@ num_constraints2 = num_robots - 1 + num_adversaries
 A2 = cp.Parameter((num_constraints2,2),value=np.zeros((num_constraints2,2)))
 b2 = cp.Parameter((num_constraints2,1),value=np.zeros((num_constraints2,1)))
 const2 = [A2 @ u2 <= b2]
-const2 += [cp.abs(u2[0,0])<=10.0]
-const2 += [cp.abs(u2[1,0])<=10.0]
+# const2 += [cp.abs(u2[0,0])<=10.0]
+# const2 += [cp.abs(u2[1,0])<=40.0]
 objective2 = cp.Minimize( Q2 @ u2 )
 best_controller = cp.Problem( objective2, const2 )
 
 ##########################################################################################
+
+# for i in range(num_steps):
+    
+#     const_index = 0
+    
+#     ## Greedy's nominal movement
+#     u_greedy_nominal = np.array([1.0, 0.0])
+#     greedy_nominal[0].step(u_greedy_nominal)
+    
+#     ## Greedy's believed movement
+#     V_nominal, dV_dx_nominal = greedy[0].lyapunov( greedy_nominal[0].X  )
+#     greedy[0].x_dot_nominal = -1.0 * dV_dx_nominal.T /np.linalg.norm( dV_dx_nominal )
+    
+#     ## Greedy actual movement
+#     V, dV_dx = greedy[0].lyapunov( robots[0].X )
+#     greedy[0].U_ref = -1.0 * dV_dx.T / np.linalg.norm( dV_dx )
+        
+#     # Move nominal agents
+#     for j in range(num_robots):
+#         u_nominal = np.array([1.0,-0.5])
+#         robots_nominal[j].step( u_nominal )
+#         V, dV_dx = robots[j].lyapunov(robots_nominal[j].X)
+#         robots[j].x_dot_nominal = -3.0*dV_dx.T/np.linalg.norm(dV_dx)
+#         robots[j].U_ref = robots[j].nominal_input( robots_nominal[j] )
+#         print(f" {j} input: {robots[j].U_ref} ")
+#         robots_nominal[j].render_plot()
+        
+#     t = t + dt
+    
+#     fig.canvas.draw()
+#     fig.canvas.flush_events()
+    
+    
+# exit()
+
+
 
 for i in range(num_steps):
     
@@ -90,20 +129,20 @@ for i in range(num_steps):
     
     ## Greedy's believed movement
     V_nominal, dV_dx_nominal = greedy[0].lyapunov( greedy_nominal[0].X  )
-    u_greedy_nominal = -1.0 * dV_dx_nominal.T /np.linalg.norm( dV_dx_nominal )
+    greedy[0].x_dot_nominal = -1.0 * dV_dx_nominal.T /np.linalg.norm( dV_dx_nominal )
     
     ## Greedy actual movement
     V, dV_dx = greedy[0].lyapunov( robots[0].X )
-    u_greedy = -5.0 * dV_dx.T / np.linalg.norm( dV_dx )
-    greedy[0].step(u_greedy)
-    
+    greedy[0].U_ref = -2.0 * dV_dx.T / np.linalg.norm( dV_dx )
+        
     # Move nominal agents
     for j in range(num_robots):
-        u_nominal = np.array([0,1.0])
+        u_nominal = np.array([1.0,0.0])
         robots_nominal[j].step( u_nominal )
         V, dV_dx = robots[j].lyapunov(robots_nominal[j].X)
-        robots[j].U_nominal = -3.0*dV_dx.T/np.linalg.norm(dV_dx)
-        
+        robots[j].x_dot_nominal = -3.0*dV_dx.T/np.linalg.norm(dV_dx)
+        robots[j].U_ref = robots[j].nominal_input( robots_nominal[j] )
+        robots_nominal[j].render_plot()
     
     for j in range(num_robots):
         
@@ -112,10 +151,10 @@ for i in range(num_steps):
         # greedy
         for k in range(num_adversaries):
             h, dh_dxi, dh_dxk = robots[j].agent_barrier(greedy[k], d_min);  
-            
+                
             # Control QP constraint
             robots[j].A1[const_index,:] = dh_dxi @ robots[j].g()
-            robots[j].b1[const_index] = -dh_dxi @ robots[j].f() - dh_dxk @ ( greedy[k].f() + greedy[k].g() @ greedy[k].U ) - robots[j].adv_alpha[k] * h
+            robots[j].b1[const_index] = -dh_dxi @ robots[j].f() - dh_dxk @ ( greedy[k].f() + greedy[k].g() @ greedy[k].U ) - cbf_extra_bad - robots[j].adv_alpha[k] * h
             const_index = const_index + 1
 
             # Best Case LP objective
@@ -126,15 +165,15 @@ for i in range(num_steps):
             if k==j:
                 continue
             
-            h, dh_dxi, dh_dxk = robots[j].agent_barrier(robots[k], d_min);
+            h, dh_dxj, dh_dxk = robots[j].agent_barrier(robots[k], d_min);
                 
             # Control QP constraint
-            robots[j].A1[const_index,:] = dh_dxi @ robots[j].g()
-            robots[j].b1[const_index] = -dh_dxi @ robots[j].f() - dh_dxk @ ( robots[k].f() + robots[k].g() @ robots[k].U ) - robots[j].robot_alpha[k] * h
+            robots[j].A1[const_index,:] = dh_dxj @ robots[j].g()
+            robots[j].b1[const_index] = -dh_dxj @ robots[j].f() - dh_dxk @ ( robots[k].f() + robots[k].g() @ robots[k].U ) - cbf_extra_bad - robots[j].robot_alpha[k] * h
             const_index = const_index + 1
             
             # Best Case LP objective
-            robots[j].robot_objective[k] = dh_dxi @ robots[j].g()
+            robots[j].robot_objective[k] = dh_dxj @ robots[j].g()
             
         
         
@@ -151,21 +190,23 @@ for i in range(num_steps):
         
         for k in range(num_adversaries):
             Q2 = robots[j].adv_objective[k]
-            best_controller.solve()
+            best_controller.solve(solver=cp.GUROBI)
             if best_controller.status!='optimal':
                 print(f"LP status:{best_controller.status}")
                         
-            h, dh_dxi, dh_dxk = robots[j].agent_barrier(greedy[k], d_min);              
-            A = dh_dxk
-            b = -robots[j].adv_alpha[0] * h  - dh_dxi @ ( robots[j].f() + robots[j].g() @ u2.value ) #- dh_dxi @ robots[j].U
+            h, dh_dxj, dh_dxk = robots[j].agent_barrier(greedy[k], d_min);   
+            assert(h<0.01)           
+            A = dh_dxk @ greedy[k].g()
+            b = -robots[j].adv_alpha[0] * h  - dh_dxj @ ( robots[j].f() + robots[j].g() @ u2.value ) - dh_dxk @ greedy[k].f() #- dh_dxi @ robots[j].U
             
-            robots[j].trust_adv = compute_trust( A, b, u_greedy, u_greedy_nominal, h, min_dist, h_min )  
-            if 1:#robots[j].trust_adv<0:
+            robots[j].trust_adv = compute_trust( A, b, greedy[k].f() + greedy[k].g() @ greedy[k].U, u_greedy_nominal, h, min_dist, h_min )  
+            if robots[j].trust_adv<0:
                 print(f"{j}'s Trust of {k} adversary: {best_controller.status}: {robots[j].trust_adv}, h:{h} ")    
-            # robots[j].adv_alpha[0] = robots[j].adv_alpha[0] + alpha_der_max * robots[j].trust_adv
+            robots[j].adv_alpha[0] = robots[j].adv_alpha[0] + alpha_der_max * robots[j].trust_adv
             if (robots[j].adv_alpha[0]<0):
                 robots[j].adv_alpha[0] = 0.01
-                 
+            
+            
         for k in range(num_robots):
             if k==j:
                 continue
@@ -174,27 +215,29 @@ for i in range(num_steps):
             best_controller.solve()
                     
             h, dh_dxi, dh_dxk = robots[j].agent_barrier(robots[k], d_min);
-            A = dh_dxk
-            b = -robots[j].robot_alpha[k] * h - dh_dxi @ ( robots[j].f() + robots[j].g() @  u2.value)  #- dh_dxi @ robots[j].U  # need best case U here. not previous U
+            assert(h<0.01)
+            A = dh_dxk 
+            b = -robots[j].robot_alpha[k] * h - dh_dxi @ ( robots[j].f() + robots[j].g() @  u2.value) #- dh_dxi @ robots[j].U  # need best case U here. not previous U
             
-            robots[j].trust_robot = compute_trust( A, b, robots[k].U, robots[k].U_nominal, h, min_dist, h_min )            
-            if 1:#robots[j].trust_robot<0:
+            robots[j].trust_robot = compute_trust( A, b, robots[k].f() + robots[k].g() @ robots[k].U, robots[k].x_dot_nominal, h, min_dist, h_min )            
+            if robots[j].trust_robot<0:
                 print(f"{j}'s Trust of {k} robot: {best_controller.status}: {robots[j].trust_adv}, h:{h}")
-            # robots[j].robot_alpha[k] = robots[j].robot_alpha[k] + alpha_der_max * robots[j].trust_robot
+            robots[j].robot_alpha[k] = robots[j].robot_alpha[k] + alpha_der_max * robots[j].trust_robot
             if (robots[j].robot_alpha[k]<0):
                 robots[j].robot_alpha[k] = 0.01
         
         # Solve for control input
-        u1_ref.value = robots[j].U_nominal
-        cbf_controller.solve()
+        u1_ref.value = robots[j].U_ref
+        cbf_controller.solve(solver=cp.GUROBI)
         if cbf_controller.status!='optimal':
             print(f"{j}'s input: {cbf_controller.status}")
         robots[j].nextU = u1.value        
         
+    greedy[0].step(greedy[0].U_ref)
     for j in range(num_robots):
         robots[j].step( robots[j].nextU )
         robots[j].render_plot()
-        print(f"{j} alphas: {robots[j].robot_alpha}, adv_alhpa:{robots[j].adv_alpha}")
+        # print(f"{j} state: {robots[j].X[1,0]}")
     
     t = t + dt
     
