@@ -8,25 +8,26 @@ from utils.utils import *
 
 # Sim Parameters                  
 dt = 0.05
-tf = 10
+tf = 4.1
 num_steps = int(tf/dt)
 t = 0
 d_min = 1.0#0.1
 
 h_min = 1.0##0.4   # more than this and do not decrease alpha
-min_dist = 0.1#0.05  # less than this and dercrease alpha
+min_dist = 1.0 # 0.1#0.05  # less than this and dercrease alpha
 cbf_extra_bad = 0.0
+update_param = False
 
 alpha_cbf = 0.8
-alpha_der_max = 0.5
+alpha_der_max = 1.0#0.5
 
 # Plot                  
 plt.ion()
 fig = plt.figure()
-ax = plt.axes(xlim=(0,10),ylim=(-10,10))
+ax = plt.axes(xlim=(0,10),ylim=(-7,7))
 ax.set_xlabel("X")
 ax.set_ylabel("Y")
-ax.set_aspect(1)
+# ax.set_aspect(1)
 
 # agents
 robots = []
@@ -82,7 +83,7 @@ objective2 = cp.Minimize( Q2 @ u2 )
 best_controller = cp.Problem( objective2, const2 )
 
 ##########################################################################################
-
+      
 # for i in range(num_steps):
     
 #     const_index = 0
@@ -188,43 +189,47 @@ for i in range(num_steps):
         
         # Solve for trust factor
         
-        for k in range(num_adversaries):
-            Q2 = robots[j].adv_objective[k]
-            best_controller.solve(solver=cp.GUROBI)
-            if best_controller.status!='optimal':
-                print(f"LP status:{best_controller.status}")
+        if update_param:
+            for k in range(num_adversaries):
+                Q2 = robots[j].adv_objective[k]
+                best_controller.solve(solver=cp.GUROBI)
+                if best_controller.status!='optimal':
+                    print(f"LP status:{best_controller.status}")
+                            
+                h, dh_dxj, dh_dxk = robots[j].agent_barrier(greedy[k], d_min);   
+                # print(f"out, h:{h}, j:{j}, k:{k}, alpha:{robots[j].adv_alpha[0]}")
+                # assert(h<0.03)           
+                A = dh_dxk @ greedy[k].g()
+                b = -robots[j].adv_alpha[0] * h  - dh_dxj @ ( robots[j].f() + robots[j].g() @ u2.value ) - dh_dxk @ greedy[k].f() #- dh_dxi @ robots[j].U
+                
+                robots[j].trust_adv = compute_trust( A, b, greedy[k].f() + greedy[k].g() @ greedy[k].U, u_greedy_nominal, h, min_dist, h_min )  
+                if robots[j].trust_adv<0:
+                    print(f"{j}'s Trust of {k} adversary: {best_controller.status}: {robots[j].trust_adv}, h:{h} ")    
+                robots[j].adv_alpha[0] = robots[j].adv_alpha[0] + alpha_der_max * robots[j].trust_adv
+                if (robots[j].adv_alpha[0]<0):
+                    robots[j].adv_alpha[0] = 0.01
+                
+                
+            for k in range(num_robots):
+                if k==j:
+                    continue
+            
+                Q2 = robots[j].robot_objective[k]
+                best_controller.solve()
+                if best_controller.status!='optimal':
+                    print(f"LP status:{best_controller.status}")
                         
-            h, dh_dxj, dh_dxk = robots[j].agent_barrier(greedy[k], d_min);   
-            assert(h<0.01)           
-            A = dh_dxk @ greedy[k].g()
-            b = -robots[j].adv_alpha[0] * h  - dh_dxj @ ( robots[j].f() + robots[j].g() @ u2.value ) - dh_dxk @ greedy[k].f() #- dh_dxi @ robots[j].U
-            
-            robots[j].trust_adv = compute_trust( A, b, greedy[k].f() + greedy[k].g() @ greedy[k].U, u_greedy_nominal, h, min_dist, h_min )  
-            if robots[j].trust_adv<0:
-                print(f"{j}'s Trust of {k} adversary: {best_controller.status}: {robots[j].trust_adv}, h:{h} ")    
-            robots[j].adv_alpha[0] = robots[j].adv_alpha[0] + alpha_der_max * robots[j].trust_adv
-            if (robots[j].adv_alpha[0]<0):
-                robots[j].adv_alpha[0] = 0.01
-            
-            
-        for k in range(num_robots):
-            if k==j:
-                continue
-        
-            Q2 = robots[j].robot_objective[k]
-            best_controller.solve()
-                    
-            h, dh_dxi, dh_dxk = robots[j].agent_barrier(robots[k], d_min);
-            assert(h<0.01)
-            A = dh_dxk 
-            b = -robots[j].robot_alpha[k] * h - dh_dxi @ ( robots[j].f() + robots[j].g() @  u2.value) #- dh_dxi @ robots[j].U  # need best case U here. not previous U
-            
-            robots[j].trust_robot = compute_trust( A, b, robots[k].f() + robots[k].g() @ robots[k].U, robots[k].x_dot_nominal, h, min_dist, h_min )            
-            if robots[j].trust_robot<0:
-                print(f"{j}'s Trust of {k} robot: {best_controller.status}: {robots[j].trust_adv}, h:{h}")
-            robots[j].robot_alpha[k] = robots[j].robot_alpha[k] + alpha_der_max * robots[j].trust_robot
-            if (robots[j].robot_alpha[k]<0):
-                robots[j].robot_alpha[k] = 0.01
+                h, dh_dxi, dh_dxk = robots[j].agent_barrier(robots[k], d_min);
+                assert(h<0.01)
+                A = dh_dxk 
+                b = -robots[j].robot_alpha[k] * h - dh_dxi @ ( robots[j].f() + robots[j].g() @  u2.value) #- dh_dxi @ robots[j].U  # need best case U here. not previous U
+                
+                robots[j].trust_robot = compute_trust( A, b, robots[k].f() + robots[k].g() @ robots[k].U, robots[k].x_dot_nominal, h, min_dist, h_min )            
+                if robots[j].trust_robot<0:
+                    print(f"{j}'s Trust of {k} robot: {best_controller.status}: {robots[j].trust_robot}, h:{h}")
+                robots[j].robot_alpha[k] = robots[j].robot_alpha[k] + alpha_der_max * robots[j].trust_robot
+                if (robots[j].robot_alpha[k]<0):
+                    robots[j].robot_alpha[k] = 0.01
         
         # Solve for control input
         u1_ref.value = robots[j].U_ref
@@ -237,7 +242,7 @@ for i in range(num_steps):
     for j in range(num_robots):
         robots[j].step( robots[j].nextU )
         robots[j].render_plot()
-        # print(f"{j} state: {robots[j].X[1,0]}")
+        print(f"{j} state: {robots[j].X[1,0]}, input:{robots[j].nextU[0,0]}, {robots[j].nextU[1,0]}")
     
     t = t + dt
     
