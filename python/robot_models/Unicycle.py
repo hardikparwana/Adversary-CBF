@@ -26,7 +26,7 @@ class Unicycle:
         self.render_plot()
         
         # for Trust computation
-        self.adv_alpha = alpha*np.ones(num_adversaries)
+        self.adv_alpha =  alpha*np.ones(num_adversaries)# alpha*np.ones((1,num_adversaries))
         self.trust_adv = 1
         self.robot_alpha = alpha*np.ones(num_robots)
         self.trust_robot = 1
@@ -36,6 +36,15 @@ class Unicycle:
         num_constraints1  = num_robots - 1 + num_adversaries
         self.A1 = np.zeros((num_constraints1,2))
         self.b1 = np.zeros((num_constraints1,1))
+        
+        # For plotting
+        self.adv_alphas = alpha*np.ones((1,num_adversaries))
+        self.trust_advs = np.ones((1,num_adversaries))
+        self.robot_alphas = alpha*np.ones((1,num_robots))
+        self.trust_robots = 1*np.ones((1,num_robots))
+        self.Xs = X0.reshape(-1,1)
+        self.Us = np.array([0,0]).reshape(-1,1)
+
      
     def f(self):
         return np.array([0,0,0]).reshape(-1,1)
@@ -49,6 +58,8 @@ class Unicycle:
         self.U = U.reshape(-1,1)
         self.X = self.X + ( self.f() + self.g() @ self.U )*self.dt
         self.X[2,0] = wrap_angle(self.X[2,0])
+        self.Xs = np.append(self.Xs,self.X,axis=1)
+        self.Us = np.append(self.Us,self.U,axis=1)
         return self.X
     
     def render_plot(self):
@@ -65,7 +76,7 @@ class Unicycle:
         #Define gamma for the Lyapunov function
         k_omega = 2.0 #0.5#2.5
         k_v = 2.0 #0.5
-        theta_d = np.arctan2(G.X[:,0][1]-self.X[1,0],G.X[:,0][0]-self.X[0,0])
+        theta_d = np.arctan2(G.X[1,0]-self.X[1,0],G.X[0,0]-self.X[0,0])
         error_theta = wrap_angle( theta_d - self.X[2,0] )
 
         omega = k_omega*error_theta

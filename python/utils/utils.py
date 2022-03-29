@@ -63,7 +63,7 @@ def compute_trust(A,b,uj,uj_nominal,h,min_dist,h_min):
     # distance
     rho_dist = b - A @ uj;
     assert(rho_dist>-0.01)
-    assert(h<0.01)
+    # assert(h<0.03)
     # assert(-1>0)
     # if h>-h_min:
     #     print(f"small h: {h}")
@@ -95,8 +95,9 @@ def compute_trust(A,b,uj,uj_nominal,h,min_dist,h_min):
         if h<-h_min:  # far away. therefore still relax/positive
             trust = 2*rho_theta*rho_dist 
         else:  # definitely negative this time
-            print("Negative Trust!")
-            trust = -2*(1-rho_theta)*rho_theta
+            # print("Negative Trust!")
+            # trust = -2*(1-rho_theta)*rho_theta
+            trust = -2*(1-rho_theta)*rho_dist
         
     
     # if (rho_theta>0.5): # can trust to be intact. 
@@ -108,6 +109,6 @@ def compute_trust(A,b,uj,uj_nominal,h,min_dist,h_min):
     #     if rho_dist<min_dist:  # get away from it as fast as possible. HOWEVER, if h itself is too large, better to not move away too much
     #         trust = -2*(1-rho_theta)*(1-rho_dist); # negative
     #     else:   # still far away so no need to run away yet but be cautious
-            trust = 2*rho_theta*rho_dist;  # low positive
+            # trust = 2*rho_theta*rho_dist;  # low positive
             
     return trust
