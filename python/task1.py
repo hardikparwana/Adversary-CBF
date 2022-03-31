@@ -6,8 +6,8 @@ from robot_models.SingleIntegrator2D import *
 from utils.utils import *
 
 # Sim Parameters                  
-dt = 0.05
-tf = 10
+dt = 0.01
+tf = 6.5#10
 num_steps = int(tf/dt)
 t = 0
 d_min = 0.1
@@ -81,6 +81,8 @@ best_controller = cp.Problem( objective2, const2 )
 
 ##########################################################################################
 
+tp = []
+
 for i in range(num_steps):
     
     const_index = 0
@@ -116,7 +118,7 @@ for i in range(num_steps):
             
             # Control QP constraint
             robots[j].A1[const_index,:] = dh_dxi @ robots[j].g()
-            robots[j].b1[const_index] = -dh_dxi @ robots[j].f() - dh_dxk @ ( greedy[k].f() + greedy[k].g() @ greedy[k].U ) - robots[j].adv_alpha[k] * h
+            robots[j].b1[const_index] = -dh_dxi @ robots[j].f() - dh_dxk @ ( greedy[k].f() + greedy[k].g() @ greedy[k].U ) - robots[j].adv_alpha[0,k] * h
             const_index = const_index + 1
 
             # Best Case LP objective
@@ -131,7 +133,7 @@ for i in range(num_steps):
                 
             # Control QP constraint
             robots[j].A1[const_index,:] = dh_dxi @ robots[j].g()
-            robots[j].b1[const_index] = -dh_dxi @ robots[j].f() - dh_dxk @ ( robots[k].f() + robots[k].g() @ robots[k].U ) - robots[j].robot_alpha[k] * h
+            robots[j].b1[const_index] = -dh_dxi @ robots[j].f() - dh_dxk @ ( robots[k].f() + robots[k].g() @ robots[k].U ) - robots[j].robot_alpha[0,k] * h
             const_index = const_index + 1
             
             # Best Case LP objective
@@ -158,14 +160,14 @@ for i in range(num_steps):
                             
                 h, dh_dxi, dh_dxk = robots[j].agent_barrier(greedy[k], d_min);              
                 A = dh_dxk
-                b = -robots[j].adv_alpha[0] * h  - dh_dxi @ ( robots[j].f() + robots[j].g() @ u2.value ) #- dh_dxi @ robots[j].U
+                b = -robots[j].adv_alpha[0,k] * h  - dh_dxi @ ( robots[j].f() + robots[j].g() @ u2.value ) #- dh_dxi @ robots[j].U
                 
-                robots[j].trust_adv = compute_trust( A, b, u_greedy, u_greedy_nominal, h, min_dist, h_min )  
-                if 1:#robots[j].trust_adv<0:
-                    print(f"{j}'s Trust of {k} adversary: {best_controller.status}: {robots[j].trust_adv}, h:{h} ")    
-                robots[j].adv_alpha[0] = robots[j].adv_alpha[0] + alpha_der_max * robots[j].trust_adv
-                if (robots[j].adv_alpha[0]<0):
-                    robots[j].adv_alpha[0] = 0.01
+                robots[j].trust_adv[0,k] = compute_trust( A, b, u_greedy, u_greedy_nominal, h, min_dist, h_min )  
+                if robots[j].trust_adv[0,k]<0:
+                    print(f"{j}'s Trust of {k} adversary: {best_controller.status}: {robots[j].trust_adv[0,k]}, h:{h} ")    
+                robots[j].adv_alpha[0,k] = robots[j].adv_alpha[0,k] + alpha_der_max * robots[j].trust_adv[0,k]/0.05*dt
+                if (robots[j].adv_alpha[0,k]<0):
+                    robots[j].adv_alpha[0,k] = 0.01
                     
             for k in range(num_robots):
                 if k==j:
@@ -176,14 +178,22 @@ for i in range(num_steps):
                         
                 h, dh_dxi, dh_dxk = robots[j].agent_barrier(robots[k], d_min);
                 A = dh_dxk
-                b = -robots[j].robot_alpha[k] * h - dh_dxi @ ( robots[j].f() + robots[j].g() @  u2.value)  #- dh_dxi @ robots[j].U  # need best case U here. not previous U
+                b = -robots[j].robot_alpha[0,k] * h - dh_dxi @ ( robots[j].f() + robots[j].g() @  u2.value)  #- dh_dxi @ robots[j].U  # need best case U here. not previous U
                 
-                robots[j].trust_robot = compute_trust( A, b, robots[k].U, robots[k].U_nominal, h, min_dist, h_min )            
-                if 1:#robots[j].trust_robot<0:
-                    print(f"{j}'s Trust of {k} robot: {best_controller.status}: {robots[j].trust_adv}, h:{h}")
-                robots[j].robot_alpha[k] = robots[j].robot_alpha[k] + alpha_der_max * robots[j].trust_robot
-                if (robots[j].robot_alpha[k]<0):
-                    robots[j].robot_alpha[k] = 0.01
+                robots[j].trust_robot[0,k] = compute_trust( A, b, robots[k].U, robots[k].U_nominal, h, min_dist, h_min )            
+                if robots[j].trust_robot[0,k]<0:
+                    print(f"{j}'s Trust of {k} robot: {best_controller.status}: {robots[j].trust_robot[0,k]}, h:{h}")
+                robots[j].robot_alpha[0,k] = robots[j].robot_alpha[0,k] + alpha_der_max * robots[j].trust_robot[0,k]/0.05*dt
+                if (robots[j].robot_alpha[0,k]<0):
+                    robots[j].robot_alpha[0,k] = 0.01
+                    
+        # Plotting
+        robots[j].adv_alphas = np.append( robots[j].adv_alphas, robots[j].adv_alpha, axis=0 )
+        robots[j].trust_advs = np.append( robots[j].trust_advs, robots[j].trust_adv, axis=0 )
+        robots[j].robot_alphas = np.append( robots[j].robot_alphas, robots[j].robot_alpha, axis=0 )
+        robots[j].trust_robots = np.append( robots[j].trust_robots, robots[j].trust_robot, axis=0 )
+        robots[j].robot_hs = np.append( robots[j].robot_hs, robots[j].robot_h, axis=0 )
+        robots[j].adv_hs = np.append( robots[j].adv_hs, robots[j].adv_h, axis=0 )
         
         # Solve for control input
         u1_ref.value = robots[j].U_nominal
@@ -195,9 +205,95 @@ for i in range(num_steps):
     for j in range(num_robots):
         robots[j].step( robots[j].nextU )
         robots[j].render_plot()
-        print(f"{j} alphas: {robots[j].robot_alpha}, adv_alhpa:{robots[j].adv_alpha}")
+        # print(f"{j} alphas: {robots[j].robot_alpha[0,j]}, adv_alhpa:{robots[j].adv_alpha}")
     
     t = t + dt
+    tp.append(t)
     
     fig.canvas.draw()
     fig.canvas.flush_events()
+    
+   
+plt.ioff()   
+# Plot
+
+
+####### Alphas #######
+# Robot 0
+figure1, axis1 = plt.subplots(2, 2)
+axis1[0,0].plot(tp,robots[0].adv_alphas[1:,0],'r',label='Adversary')
+axis1[0,0].plot(tp,robots[0].robot_alphas[1:,1],'g',label='Robot 2')
+axis1[0,0].plot(tp,robots[0].robot_alphas[1:,2],'k',label='Robot 3')
+axis1[0,0].set_title('Robot 1 alphas')
+axis1[0,0].set_xlabel('time (s)')
+axis1[0,0].legend()
+
+# Robot 1
+axis1[1,0].plot(tp,robots[1].adv_alphas[1:,0],'r',label='Adversary')
+axis1[1,0].plot(tp,robots[1].robot_alphas[1:,0],'g',label='Robot 1')
+axis1[1,0].plot(tp,robots[1].robot_alphas[1:,2],'k',label='Robot 3')
+axis1[1,0].set_title('Robot 2 alphas')
+axis1[1,0].set_xlabel('time (s)')
+axis1[1,0].legend()
+
+# Robot 2
+axis1[0,1].plot(tp,robots[2].adv_alphas[1:,0],'r',label='Adversary')
+axis1[0,1].plot(tp,robots[2].robot_alphas[1:,0],'g',label='Robot 1')
+axis1[0,1].plot(tp,robots[2].robot_alphas[1:,1],'k',label='Robot 2')
+axis1[0,1].set_title('Robot 3 alphas')
+axis1[0,1].set_xlabel('time (s)')
+axis1[0,1].legend()
+
+#### TRUST ######
+# Robot 0
+figure2, axis2 = plt.subplots(2, 2)
+axis2[0,0].plot(tp,robots[0].trust_robots[1:,1],'g',label='Robot 2')
+axis2[0,0].plot(tp,robots[0].trust_advs[1:,0],'r',label='Adversary')
+axis2[0,0].plot(tp,robots[0].trust_robots[1:,2],'k',label='Robot 3')
+axis2[0,0].set_title('Robot 1 trust')
+axis2[0,0].set_xlabel('time (s)')
+axis2[0,0].legend()
+
+# Robot 1
+axis2[1,0].plot(tp,robots[1].trust_robots[1:,0],'g',label='Robot 1')
+axis2[1,0].plot(tp,robots[1].trust_advs[1:,0],'r',label='Adversary')
+axis2[1,0].plot(tp,robots[1].trust_robots[1:,2],'k',label='Robot 3')
+axis2[1,0].set_title('Robot 2 trust')
+axis2[1,0].set_xlabel('time (s)')
+axis2[1,0].legend()
+
+# Robot 2
+axis2[0,1].plot(tp,robots[2].trust_advs[1:,0],'r',label='Adversary')
+axis2[0,1].plot(tp,robots[2].trust_robots[1:,0],'g',label='Robot 1')
+axis2[0,1].plot(tp,robots[2].trust_robots[1:,1],'k',label='Robot 2')
+axis2[0,1].set_title('Robot 3 trust')
+axis2[0,1].set_xlabel('time (s)')
+axis2[0,1].legend()
+
+######### Barriers ##########
+# Robot 0
+figure3, axis3 = plt.subplots(2, 2)
+axis3[0,0].plot(tp,robots[0].robot_hs[1:,1],'g',label='Robot 2')
+axis3[0,0].plot(tp,robots[0].adv_hs[1:,0],'r',label='Adversary')
+axis3[0,0].plot(tp,robots[0].robot_hs[1:,2],'k',label='Robot 3')
+axis3[0,0].set_title('Robot 1 CBFs')
+axis3[0,0].set_xlabel('time (s)')
+axis3[0,0].legend()
+
+# Robot 1
+axis3[1,0].plot(tp,robots[1].robot_hs[1:,0],'g',label='Robot 1')
+axis3[1,0].plot(tp,robots[1].adv_hs[1:,0],'r',label='Adversary')
+axis3[1,0].plot(tp,robots[1].robot_hs[1:,2],'k',label='Robot 3')
+axis3[1,0].set_title('Robot 2 CBFs')
+axis3[1,0].set_xlabel('time (s)')
+axis3[1,0].legend()
+
+# Robot 2
+axis3[0,1].plot(tp,robots[2].adv_hs[1:,0],'r',label='Adversary')
+axis3[0,1].plot(tp,robots[2].robot_hs[1:,0],'g',label='Robot 1')
+axis3[0,1].plot(tp,robots[2].robot_hs[1:,1],'k',label='Robot 3')
+axis3[0,1].set_title('Robot 3 CBFs')
+axis3[0,1].set_xlabel('time (s)')
+axis3[0,1].legend()
+
+plt.show()
