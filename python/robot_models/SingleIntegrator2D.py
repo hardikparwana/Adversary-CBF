@@ -2,7 +2,7 @@ import numpy as np
 
 class SingleIntegrator2D:
     
-    def __init__(self,X0,dt,ax,id=0,num_robots=1,num_adversaries = 1, alpha=0.8,color='r',palpha=1.0):
+    def __init__(self,X0,dt,ax,id=0,num_robots=1,num_adversaries = 1, alpha=0.8,color='r',palpha=1.0,plot=True):
         '''
         X0: iniytial state
         dt: simulation time step
@@ -24,20 +24,43 @@ class SingleIntegrator2D:
         self.nextU = self.U
 
         # Plot handles
-        self.body = ax.scatter([],[],c=color,alpha=palpha,s=10)
-        self.render_plot()
+        self.plot = plot
+        if self.plot:
+            self.body = ax.scatter([],[],c=color,alpha=palpha,s=10)
+            self.render_plot()
         
-        # for Trust computation
-        self.adv_alpha = alpha*np.ones(num_adversaries)
-        self.trust_adv = 1
-        self.robot_alpha = alpha*np.ones(num_robots)
-        self.trust_robot = 1
+         # for Trust computation
+        self.adv_alpha =  alpha*np.ones((1,num_adversaries))# alpha*np.ones((1,num_adversaries))
+        self.trust_adv = np.ones((1,num_adversaries))
+        self.robot_alpha = alpha*np.ones((1,num_robots))
+        self.trust_robot = np.ones((1,num_robots))
         self.adv_objective = [0] * num_adversaries
         self.robot_objective = [0] * num_robots
+        self.robot_h = np.ones((1,num_robots))
+        self.adv_h = np.ones((1,num_adversaries))        
+        
+        # Old
+        # for Trust computation
+        # self.adv_alpha = alpha*np.ones(num_adversaries)
+        # self.trust_adv = 1
+        # self.robot_alpha = alpha*np.ones(num_robots)
+        # self.trust_robot = 1
+        # self.adv_objective = [0] * num_adversaries
+        # self.robot_objective = [0] * num_robots
         
         num_constraints1  = num_robots - 1 + num_adversaries
         self.A1 = np.zeros((num_constraints1,2))
         self.b1 = np.zeros((num_constraints1,1))
+        
+        # For plotting
+        self.adv_alphas = alpha*np.ones((1,num_adversaries))
+        self.trust_advs = np.ones((1,num_adversaries))
+        self.robot_alphas = alpha*np.ones((1,num_robots))
+        self.trust_robots = 1*np.ones((1,num_robots))
+        self.Xs = X0.reshape(-1,1)
+        self.Us = np.array([0,0]).reshape(-1,1)
+        self.adv_hs = np.ones((1,num_adversaries))
+        self.robot_hs = np.ones((1,num_robots))
         
         
     def f(self):
@@ -51,14 +74,16 @@ class SingleIntegrator2D:
         self.U = U.reshape(-1,1)
         self.X = self.X + ( self.f() + self.g() @ self.U )*self.dt
         self.render_plot()
+        self.Xs = np.append(self.Xs,self.X,axis=1)
+        self.Us = np.append(self.Us,self.U,axis=1)
         return self.X
 
     def render_plot(self):
-        
-        x = np.array([self.X[0,0],self.X[1,0]])
+        if self.plot:
+            x = np.array([self.X[0,0],self.X[1,0]])
 
-        # scatter plot update
-        self.body.set_offsets([x[0],x[1]])
+            # scatter plot update
+            self.body.set_offsets([x[0],x[1]])
 
     def lyapunov(self, G):
         V = np.linalg.norm( self.X - G[0:2] )**2

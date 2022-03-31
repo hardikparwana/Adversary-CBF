@@ -87,16 +87,39 @@ def compute_trust(A,b,uj,uj_nominal,h,min_dist,h_min):
         rho_dist = 0.01
         # print("WARNING: <0")
     
+    h_eff = -h
+    if h_eff<0:
+        h_eff = 0.01
+    if h_eff>10:
+        h_eff = 10
+        
+    h_dist = 4*np.tanh(h_eff/np.abs(h_min))
+    assert(h_dist>0)
+    
     # rho_dist and rho_theta both positive
     print(f"rho_dist:{rho_dist}, h:{h}, h_min:{h_min} ")
+    # if rho_dist>min_dist: # always positive
+    #     # trust = 2*rho_theta*(rho_dist-min_dist)/h_eff
+    #     trust = 2*rho_theta*(rho_dist-min_dist)/h_dist
+    # else: # danger
+    #     if h<-h_min:  # far away. therefore still relax/positive
+    #         # trust = 2*rho_theta*rho_dist/h_eff
+    #         # trust = 2*rho_theta*rho_dist/h_dist
+    #         trust = -1*(1-rho_theta)*(rho_dist-min_dist)/h_dist
+    #     else:  # definitely negative this time
+    #         # print("Negative Trust!")
+    #         # trust = -2*(1-rho_theta)*rho_theta
+    #         # trust = -2*(1-rho_theta)*rho_dist/h_eff
+    #         # trust = -2*(1-rho_theta)*rho_dist/h_dist
+    #         trust = 1*(1-rho_theta)*(rho_dist-min_dist)/h_dist
+            
     if rho_dist>min_dist: # always positive
-        trust = 2*rho_theta*(rho_dist-min_dist)
+        trust = 2*rho_theta*rho_dist#(rho_dist-min_dist)
     else: # danger
         if h<-h_min:  # far away. therefore still relax/positive
-            trust = 2*rho_theta*rho_dist 
+            trust = 2*rho_theta*rho_dist
         else:  # definitely negative this time
             # print("Negative Trust!")
-            # trust = -2*(1-rho_theta)*rho_theta
             trust = -2*(1-rho_theta)*rho_dist
         
     

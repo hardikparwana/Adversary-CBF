@@ -3,7 +3,7 @@ from utils.utils import wrap_angle
 
 class Unicycle:
     
-    def __init__(self,X0,dt,ax,id,num_robots=1,num_adversaries = 1, alpha=0.8,color='r',palpha=1.0):
+    def __init__(self,X0,dt,ax,id,num_robots=1,num_adversaries = 1, alpha=0.8,color='r',palpha=1.0,plot=True):
         '''
         X0: iniytial state
         dt: simulation time step
@@ -22,16 +22,32 @@ class Unicycle:
         self.U_ref = np.array([0,0]).reshape(-1,1)
         
         # Plot handles
-        self.body = ax.scatter([],[],c=color,alpha=palpha,s=10)
-        self.render_plot()
+        self.plot = plot
+        if self.plot:
+            self.body = ax.scatter([],[],alpha=palpha,s=40,facecolors='none',edgecolors=color) #,c=color
+            self.radii = 0.5
+            self.palpha = palpha
+            if palpha==1:
+                self.axis = ax.plot([self.X[0,0],self.X[0,0]+self.radii*np.cos(self.X[2,0])],[self.X[1,0],self.X[1,0]+self.radii*np.sin(self.X[2,0])])
+            self.render_plot()
         
         # for Trust computation
-        self.adv_alpha =  alpha*np.ones(num_adversaries)# alpha*np.ones((1,num_adversaries))
-        self.trust_adv = 1
-        self.robot_alpha = alpha*np.ones(num_robots)
-        self.trust_robot = 1
+        self.adv_alpha =  alpha*np.ones((1,num_adversaries))# alpha*np.ones((1,num_adversaries))
+        self.trust_adv = np.ones((1,num_adversaries))
+        self.robot_alpha = alpha*np.ones((1,num_robots))
+        self.trust_robot = np.ones((1,num_robots))
         self.adv_objective = [0] * num_adversaries
         self.robot_objective = [0] * num_robots
+        self.robot_h = np.ones((1,num_robots))
+        self.adv_h = np.ones((1,num_adversaries))
+        
+        # Old
+        # self.adv_alpha =  alpha*np.ones(num_adversaries)# alpha*np.ones((1,num_adversaries))
+        # self.trust_adv = 1
+        # self.robot_alpha = alpha*np.ones(num_robots)
+        # self.trust_robot = 1
+        # self.adv_objective = [0] * num_adversaries
+        # self.robot_objective = [0] * num_robots
         
         num_constraints1  = num_robots - 1 + num_adversaries
         self.A1 = np.zeros((num_constraints1,2))
@@ -44,6 +60,8 @@ class Unicycle:
         self.trust_robots = 1*np.ones((1,num_robots))
         self.Xs = X0.reshape(-1,1)
         self.Us = np.array([0,0]).reshape(-1,1)
+        self.adv_hs = np.ones((1,num_adversaries))
+        self.robot_hs = np.ones((1,num_robots))
 
      
     def f(self):
@@ -63,8 +81,13 @@ class Unicycle:
         return self.X
     
     def render_plot(self):
-        x = np.array([self.X[0,0],self.X[1,0]])
-        self.body.set_offsets([x[0],x[1]])
+        if self.plot:
+            x = np.array([self.X[0,0],self.X[1,0]])
+            self.body.set_offsets([x[0],x[1]])
+            if self.palpha==1:
+                self.axis[0].set_ydata([self.X[1,0],self.X[1,0]+self.radii*np.sin(self.X[2,0])])
+                self.axis[0].set_xdata( [self.X[0,0],self.X[0,0]+self.radii*np.cos(self.X[2,0])] )
+        # self.axis = ax.plot([self.X[0,0],self.X[0,0]+np.cos(self.X[2,0])],[self.X[1,0],self.X[1,0]+np.sin(self.X[2,0])])
         
     def lyapunov(self, G):
         V = np.linalg.norm( self.X[0:2] - G[0:2] )**2
