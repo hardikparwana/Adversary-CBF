@@ -38,7 +38,7 @@ ax.set_ylabel("Y")
 num_adversaries = 3
 alpha = 0.1
 
-default_plot = True
+default_plot = False
 save_plot = False
 movie_name = 'test0_default.mp4'
 
