@@ -32,3 +32,20 @@ The code was run on Ubuntu 20 with Python 3.6 and following packages
 - fonttools==4.31.2
 
 In addition to above dependencies, run `source export_setup.sh` from main folder to set the paths required to access submodules.
+
+# Running the Simulation
+To simulate the scenario in paper run
+```
+python paper_task.py
+```
+
+Below we show results for 3 cases
+1. Trust based Adaptation: The CBF parameters are adapted based on trust mertic proposed in paper
+2. Constant CBF parameter(small): The CBF parameters are kept same. Their values are same as the initial values of parameters in Trust-based adaptation
+3. Constant CBF parameter(large): if you think having large CBF parameter that always allow close approach to other agents would work, then check this. The CBF parameter is about 3 times of that used before.
+
+| Trust based adaptation | Constant CBF parameter(small) | Constant CBF parameter(large) |
+| --------------| -------------------| -----------------|
+| ![PAPER_with_trust](https://user-images.githubusercontent.com/19849515/162593597-f028c61d-7a9d-4ff9-88b4-5851aeae1806.gif) | ![PAPER_NO_TRUST](https://user-images.githubusercontent.com/19849515/162593600-273fd93a-c82c-4655-b232-a03181672b15.gif) | ![PAPER_NO_TRUST_large_alpha](https://user-images.githubusercontent.com/19849515/162593605-af184d72-0d08-4c7e-bcdf-f88d18b42a5d.gif)
+
+
