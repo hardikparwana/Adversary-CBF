@@ -9,7 +9,7 @@ from utils.utils import *
 
 from matplotlib.animation import FFMpegWriter
 
-plt.rcParams.update({'font.size': 24})
+plt.rcParams.update({'font.size': 27})
 
 # Sim Parameters                  
 dt = 0.05
@@ -444,6 +444,24 @@ axis2[0,1].set_title('Robot 3 trust')
 axis2[0,1].set_xlabel('time (s)')
 axis2[0,1].legend()
 
+figure9, axis9 = plt.subplots(1, 2)
+axis9[0].plot(tp,robots[0].adv_alphas[1:,0],'r',label='Adversary')
+axis9[0].plot(tp,robots[0].robot_alphas[1:,1],'g',label='Robot 2')
+axis9[0].plot(tp,robots[0].robot_alphas[1:,2],'k',label='Robot 3')
+axis9[0].set_title(r'Robot 1 $\alpha$')
+axis9[0].set_xlabel('time (s)')
+axis9[0].legend()
+
+axis9[1].plot(tp,robots[0].adv_hs[1:,0],'r',label='Adversary - Proposed')
+axis9[1].plot(tp,robots[0].robot_hs[1:,1],'g',label='Robot 2 - Proposed')
+axis9[1].plot(tp,robots[0].robot_hs[1:,2],'k',label='Robot 3 - Proposed')
+axis9[1].plot(tp,robots_default[0].adv_hs[1:,0],'r--',label=r'Adversary - fixed $\alpha$')
+axis9[1].plot(tp,robots_default[0].robot_hs[1:,1],'g--',label=r'Robot - fixed $\alpha$')
+axis9[1].plot(tp,robots_default[0].robot_hs[1:,2],'k--',label=r'Robot - fixed $\alpha$')
+axis9[1].set_title('Robot 1 CBFs')
+axis9[1].set_xlabel('time (s)')
+axis9[1].legend()
+
 figure6, axis6 = plt.subplots(1, 1)
 axis6.plot(tp,robots[0].trust_advs[1:,0]/2,'r',label='Robot 1 trust of Adversary')
 axis6.plot(tp,robots[1].trust_advs[1:,0]/2,'r--',label='Robot 2 trust of Adversary')
@@ -481,12 +499,12 @@ axis3[0,1].set_xlabel('time (s)')
 axis3[0,1].legend()
 
 figure5, axis5 = plt.subplots(1, 1)
-axis5.plot(tp,robots[0].adv_hs[1:,0],'r',label='Adversary - Proposed')
-axis5.plot(tp,robots[0].robot_hs[1:,1],'g',label='Robot 2 - Proposed')
-axis5.plot(tp,robots[0].robot_hs[1:,2],'k',label='Robot 3 - Proposed')
-axis5.plot(tp,robots_default[0].adv_hs[1:,0],'r--',label=r'Adversary - fixed $\alpha$')
-axis5.plot(tp,robots_default[0].robot_hs[1:,1],'g--',label=r'Robot - fixed $\alpha$')
-axis5.plot(tp,robots_default[0].robot_hs[1:,2],'k--',label=r'Robot - fixed $\alpha$')
+axis5.plot(tp,-robots[0].adv_hs[1:,0],'r',label='Adversary - Proposed')
+axis5.plot(tp,-robots[0].robot_hs[1:,1],'g',label='Robot 2 - Proposed')
+axis5.plot(tp,-robots[0].robot_hs[1:,2],'k',label='Robot 3 - Proposed')
+axis5.plot(tp,-robots_default[0].adv_hs[1:,0],'r--',label=r'Adversary - fixed $\alpha$')
+axis5.plot(tp,-robots_default[0].robot_hs[1:,1],'g--',label=r'Robot - fixed $\alpha$')
+axis5.plot(tp,-robots_default[0].robot_hs[1:,2],'k--',label=r'Robot - fixed $\alpha$')
 axis5.legend()
 axis5.set_xlabel('time (s)')
 # plt.show()
@@ -506,6 +524,9 @@ plt.ylim([-0.5,8])
 # axis3 = plt.axes(xlim=(0,8),ylim=(-0.5,8))
 ax.set_xlabel("X")
 ax.set_ylabel("Y")
+
+
+
 
 
 tp = -1 + 2*np.asarray(tp)/tp[-1]
