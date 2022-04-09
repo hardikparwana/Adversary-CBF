@@ -22,8 +22,6 @@ How can an autonomous agent adapt to these different types of robots? Treating a
 This work adapts parameters of Control Barrier Functions and provides supplementary plots and videos to our submission.
 
 
-![qp_controller](https://user-images.githubusercontent.com/19849515/134256967-0d5b1f4b-aed0-45e7-9f2e-5376c2b713ca.png)
-
 # Dependencies
 The code was run on Ubuntu 20 with Python 3.6 and following packages
 cvxpy==1.2.0
@@ -34,8 +32,3 @@ osqp==0.6.2.post5
 fonttools==4.31.2
 
 In addition to above dependencies, run `source export_setup.sh` from main folder to set the paths required to access submodules.
-
-# To simulate the scenario in paper, run the following file
-```
-python paper_task.py
-```
