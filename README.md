@@ -24,11 +24,11 @@ This work adapts parameters of Control Barrier Functions and provides supplement
 
 # Dependencies
 The code was run on Ubuntu 20 with Python 3.6 and following packages
-cvxpy==1.2.0
-gurobipy==9.5.1
-matplotlib==3.5.1
-numpy==1.22.3
-osqp==0.6.2.post5
-fonttools==4.31.2
+- cvxpy==1.2.0
+- gurobipy==9.5.1
+- matplotlib==3.5.1
+- numpy==1.22.3
+- osqp==0.6.2.post5
+- fonttools==4.31.2
 
 In addition to above dependencies, run `source export_setup.sh` from main folder to set the paths required to access submodules.
