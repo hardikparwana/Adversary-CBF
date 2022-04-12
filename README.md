@@ -7,6 +7,8 @@ This repository implements our CDC 2022 submission on
 
 Authors: Hardik Parwana and Dimitra Panagou, University of Michigan
 
+A pre-print version is available ![here](https://arxiv.org/abs/2204.04555)
+
 Note: this repo is under development. While all the relevant code is present, we will work on making it more readable and customizable soon! Stay Tuned!
 
 ## Description
