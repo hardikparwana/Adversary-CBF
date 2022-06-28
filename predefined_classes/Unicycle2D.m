@@ -140,6 +140,8 @@ classdef Unicycle2D
                 d.X(3) = wrap_pi(d.X(3));
                 d.yaw = d.X(3);
                 
+                disp(d.yaw*180/pi)
+                
                 d.g =[cos(d.X(3)) 0;
                      sin(d.X(3)) 0;
                      0 1];
@@ -183,11 +185,41 @@ classdef Unicycle2D
                     dh_dx = [ (-(x1-Ox1) + wrap_pi(yaw-sigma*atan2(x2-Ox2,x1-Ox1))*sigma*(x2-Ox2)/((x1-Ox1)^2+(x2-Ox2)^2)  )/(rho-h)  ( -(x2-Ox2) - wrap_pi( yaw - sigma*atan2( x2-Ox2,x1-Ox1 ) )*sigma*(x1-Ox1)/((x1-Ox1)^2+(x2-Ox2)^2)  )/(rho-h) wrap_pi(yaw-sigma*atan2((x2-Ox2),(x1-Ox1)))/(rho-h)];           
             end
             
+            function [h, dh_dxi, dh_dxj] = agent_barrier_angle(d,agent)
+
+                    global d_min
+
+                    beta = 1.01;
+                    h = beta*d_min^22 - norm( d.X(1:2,1) - agent.X(1:2,1) )^2;
+
+                    theta = d.X(3);
+                    s = (d.X(1:2,1) - agent.X(1:2,1))' * [sin(theta);cos(theta)] ;
+                    h = h - sigma_fun(d,s);
+                    if (h>0.01)
+                        keyboard
+                    end
+                    
+                    der_sigma = sigma_fun_der(d,s);
+                    
+                    dh_dxi = [ (-2*( d.X(1:2,1) - agent.X(1:2,1) )' - der_sigma *  [sin(theta) cos(theta)])   ( -der_sigma * cos(theta)*( d.X(1,1)-agent.X(1,1) )  - sin(theta)*( d.X(2,1)-agent.X(2,1) ) ) ];
+                    dh_dxj = [ ( 2*( d.X(1:2,1) - agent.X(1:2,1) )' + der_sigma *  [sin(theta) cos(theta)])   ( 0.0 ) ];
+            end
+            
+            function out = sigma_fun(d,s)
+                k1 = 1;
+                out =  (exp(k1-s)-1)/(exp(k1-s)+1);
+            end
+
+            function out = sigma_fun_der(d,s)
+                k1 = 1;
+                out =  -exp(k1-s)/( 1+exp( k1-s ) ) * ( 1 + sigma_fun(d,s) );;
+            end
+            
                   
             function uni_input = nominal_controller(d,u_min,u_max)
                 
                 dx = d.X(1:2) - d.G;
-                kw = 0.5*u_max(2)/pi;
+                kw = 2*u_max(2)/pi;%0.5
                 phi_des = atan2( -dx(2),-dx(1) );
                 delta_phi = wrap_pi( phi_des - d.X(3) );
 

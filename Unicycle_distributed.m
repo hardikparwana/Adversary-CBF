@@ -49,11 +49,11 @@ circle(G2(1),G2(2),r);
 % Obstacles
 c1=[3 4]';
 r1=0.7;%1.6;
-Obstacle(1) = EnvObject2D( c1(1),c1(2) ,'circle',r1,0);
+Obstacle(1) = EnvObject2D( c1(1),c1(2) ,'circle','filled',r1,0);
 
 c2=[-3 8]';
 r2=0.6;%1;
-Obstacle(2) = EnvObject2D(c2(1),c2(2),'circle',r2,0 );
+Obstacle(2) = EnvObject2D(c2(1),c2(2),'circle','filled',r2,0 );
 
 n_obstacles = 2;
 
