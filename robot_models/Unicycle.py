@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from utils.utils import wrap_angle
+from utils.utils import wrap_angle, wrap_angle_tensor
 
 class Unicycle:
     
@@ -179,7 +179,7 @@ class Unicycle:
         diff = targetX[0:2,0] - X[0:2,0]
 
         theta_d = torch.atan2(targetX[1,0]-X[1,0],targetX[0,0]-X[0,0])
-        error_theta = self.wrap_angle_tensor( theta_d - X[2,0] )
+        error_theta = wrap_angle_tensor( theta_d - X[2,0] )
 
         omega = k_omega*error_theta 
         v = k_v*( torch.norm(diff) ) * torch.cos( error_theta )

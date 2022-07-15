@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 def wrap_angle(angle):
     if angle>np.pi:
@@ -6,6 +7,15 @@ def wrap_angle(angle):
     elif angle<-np.pi:
         return  angle + 2*np.pi 
     else:
+        return angle
+    
+def wrap_angle_tensor(angle):
+        angle_numpy = angle.detach().numpy()
+        factor = torch.tensor(2*np.pi,dtype=torch.float)
+        if angle_numpy>np.pi:
+            angle = angle - factor
+        if angle<-np.pi:
+            angle = angle + factor
         return angle
     
 def euler_to_rot_mat(phi,theta,psi):
