@@ -7,6 +7,8 @@ This repository implements our CDC 2022 submission on
 
 Authors: Hardik Parwana and Dimitra Panagou, University of Michigan
 
+A pre-print version is available [here](https://arxiv.org/abs/2204.04555).
+
 Note: this repo is under development. While all the relevant code is present, we will work on making it more readable and customizable soon! Stay Tuned!
 
 ## Description
@@ -17,9 +19,9 @@ How to identify an unknown robot in the system as being:
 2. Aeversarial: i.e., it tries to chase and actively violate safety requirements
 3. Uncooperative: i.e., it disregards any interaction with other agent and only moves toward's it's own goal. This is like saying: "Stay away from me and you won't be harmed!"
 
-How can an autonomous agent adapt to these different types of robots? Treating all unknown agents in similar fashion can lead to conservative response. For example, a controller might try to make the agent back-off from an adversarial agent so as to avoid collision in future. However, if it were to know that the other agent is uncooperative, then it can adjust it's parameters to allow going closer to it, slow down enough to let the other robot pass first, and then continue on it's own path. This would cause minimal deviation from nominal trajectories.
+How can an autonomous agent adapt to these different types of robots? Treating all unknown agents in similar fashion can lead to conservative response. For example, a controller might try to make the agent back-off from an adversarial agent so as to avoid collision in future. However, if it were to know that the other agent is uncooperative, then it can adjust it's parameters to allow going closer to the other robot, slowing down enough to let the other robot pass first, and then continue on it's own path. This would cause minimal deviation from nominal trajectories.
 
-This work adapts parameters of Control Barrier Functions and provides supplementary plots and videos to our submission.
+This work adapts parameters of Control Barrier Functions and this page provides supplementary plots and videos to our submission.
 
 # Simulation Results
 
