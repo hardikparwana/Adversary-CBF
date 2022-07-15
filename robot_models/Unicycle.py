@@ -3,7 +3,7 @@ from utils.utils import wrap_angle
 
 class Unicycle:
     
-    def __init__(self,X0,dt,ax,id,num_robots=1,num_adversaries = 1, alpha=0.8,color='r',palpha=1.0,plot=True):
+    def __init__(self,X0,dt,ax,id,num_robots=1,num_adversaries = 1, num_obstacles = 0, alpha=0.8,color='r',palpha=1.0,plot=True):
         '''
         X0: iniytial state
         dt: simulation time step
@@ -34,12 +34,16 @@ class Unicycle:
         # for Trust computation
         self.adv_alpha =  alpha*np.ones((1,num_adversaries))# alpha*np.ones((1,num_adversaries))
         self.trust_adv = np.ones((1,num_adversaries))
+        self.obs_alpha =  alpha*np.ones((1,num_obstacles))#
+        self.trust_obs = np.ones((1,num_obstacles))
         self.robot_alpha = alpha*np.ones((1,num_robots))
         self.trust_robot = np.ones((1,num_robots))
         self.adv_objective = [0] * num_adversaries
         self.robot_objective = [0] * num_robots
+        self.obs_objective = [0] * num_obstacles
         self.robot_h = np.ones((1,num_robots))
         self.adv_h = np.ones((1,num_adversaries))
+        self.obs_h = np.ones((1,num_obstacles))
         
         # Old
         # self.adv_alpha =  alpha*np.ones(num_adversaries)# alpha*np.ones((1,num_adversaries))
@@ -49,7 +53,7 @@ class Unicycle:
         # self.adv_objective = [0] * num_adversaries
         # self.robot_objective = [0] * num_robots
         
-        num_constraints1  = num_robots - 1 + num_adversaries
+        num_constraints1  = num_robots - 1 + num_adversaries + num_obstacles
         self.A1 = np.zeros((num_constraints1,2))
         self.b1 = np.zeros((num_constraints1,1))
         
@@ -58,10 +62,13 @@ class Unicycle:
         self.trust_advs = np.ones((1,num_adversaries))
         self.robot_alphas = alpha*np.ones((1,num_robots))
         self.trust_robots = 1*np.ones((1,num_robots))
+        self.obs_alphas = alpha*np.ones((1,num_obstacles))
+        self.trust_obss = 1*np.ones((1,num_obstacles))
         self.Xs = X0.reshape(-1,1)
         self.Us = np.array([0,0]).reshape(-1,1)
         self.adv_hs = np.ones((1,num_adversaries))
         self.robot_hs = np.ones((1,num_robots))
+        self.obs_hs = np.ones((1,num_obstacles))
 
      
     def f(self):
