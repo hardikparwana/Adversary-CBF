@@ -41,20 +41,30 @@ def getGrad(param):
             param.grad = None
             return value  
             
-def compute_A1_b1_tensor(robotsJ, robotsK, alpha, d_min):
+# def compute_A1_b1_tensor(robotsJ, robotsK, alpha, d_min):
+#     h, dh_dxj, dh_dxk = robots[j].agent_barrier_torch(robotsJ.X_torch, robotsK.X_torch, d_min, robotsK.type)
+#     A1 = dh_dxj @ robotsJ.g_torch(robotsJ.X_torch)
+#     b1 = -dh_dxj @ robotsJ.f_torch(robotsJ.X_torch) - dh_dxk @ ( robotsK.f_torch(robotsK.X_torch) + robotsK.g_torch(robotsK.X_torch) @ torch.tensor(robotsK.U,dtype=torch.float) ) - alpha * h           
+#     return A1, b1
+
+def compute_A1_b1_tensor(robotsJ, robotsK, alpha, d_min, sys_state):
     h, dh_dxj, dh_dxk = robots[j].agent_barrier_torch(robotsJ.X_torch, robotsK.X_torch, d_min, robotsK.type)
     A1 = dh_dxj @ robotsJ.g_torch(robotsJ.X_torch)
-    b1 = -dh_dxj @ robotsJ.f_torch(robotsJ.X_torch) - dh_dxk @ ( robotsK.f_torch(robotsK.X_torch) + robotsK.g_torch(robotsK.X_torch) @ torch.tensor(robotsK.U,dtype=torch.float) ) - alpha * h           
+    if robotsK.type=='Unicycle':
+        x_dot_k = torch.cat( (robotsK.gp_x(sys_state).mean,robotsK.gp_y(sys_state).mean, robotsK.gp_yaw(sys_state).mean ) ).reshape(-1,1)
+    else:
+        x_dot_k = torch.cat( (robotsK.gp_x(sys_state).mean,robotsK.gp_y(sys_state).mean ) ).reshape(-1,1)
+    b1 = -dh_dxj @ robotsJ.f_torch(robotsJ.X_torch) - dh_dxk @ x_dot_k - alpha * h           
     return A1, b1
 
-def get_input(robots,j,num_robots):
+def get_input(robots,j,num_robots,sys_state):
     robots[j].A1 = []                
     for k in range(num_robots):
         if k==j:
             continue
 
         # Get constraints
-        A1k, b1k = compute_A1_b1_tensor( robots[j], robots[k], robots[j].alpha_torch[k], d_min )
+        A1k, b1k = compute_A1_b1_tensor( robots[j], robots[k], robots[j].alpha_torch[k], d_min, sys_state )
         if robots[j].A1 == []:
             robots[j].A1 = A1k
             robots[j].b1 = b1k
@@ -163,14 +173,6 @@ robots.append( SingleIntegrator2D(np.array([0,4]), dt, ax, color='r',palpha=1.0,
 robots.append( SingleIntegrator2D(np.array([0,5]), dt, ax, color='r',palpha=1.0, target = 'move right') )
 robots.append( SingleIntegrator2D(np.array([7,7]), dt, ax, color='r',palpha=1.0, target = 'move left') )
 # agent nominal version
-robots_nominal = []
-
-robots_nominal.append( Unicycle(np.array([3,1.5,np.pi/2]), dt, ax, num_robots=num_robots, id = 0, color='g',palpha=alpha) )
-robots_nominal.append( Unicycle(np.array([2.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=alpha ) )
-robots_nominal.append( Unicycle(np.array([3.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 2, color='g',palpha=alpha ) )
-robots_nominal.append( SingleIntegrator2D(np.array([0,4]), dt, ax, color='r',palpha=1.0) )
-robots_nominal.append( SingleIntegrator2D(np.array([0,5]), dt, ax, color='r',palpha=1.0) )
-robots_nominal.append( SingleIntegrator2D(np.array([7,7]), dt, ax, color='r',palpha=1.0) )
 
 U_nominal = np.zeros((2,num_robots))
 
@@ -215,17 +217,24 @@ for i in range(num_steps):
             for k in range(num_robots):
                 robots[k].X_torch = torch.tensor(robots[k].X, requires_grad=True, dtype=torch.float)
                 robots[k].alpha_torch = torch.tensor(robots[j].alpha, requires_grad=True, dtype=torch.float)
+                if k==0:
+                    sys_state = robots[k].X_torch.T
+                else:
+                    sys_state = torch.cat( (sys_state, robots[k].X_torch.T), 1 )
                        
             # Get nominal control input and constraints
             if robots[j].identity=='adversary':
                 robots[j].U = get_adversary_input(robots,j)
             elif robots[j].identity=='nominal':
-                print(robots[j].identity)
-                # nominal input
-                robots[j].U_ref = np.array([0.0,0.0]).reshape(-1,1)
-                robots[j].U_ref_torch = torch.tensor(robots[j].U_ref,dtype=torch.float)
-                
-                Ut = get_input(robots,j,num_robots)
+                robots[j].U_nominal = np.array([1.0,0.0]).reshape(-1,1)
+                robots[j].step(robots[j].U_nominal,dt,mode='nominal')
+                # robots[j].U_ref = np.array([0.0,0.0]).reshape(-1,1)
+                # robots[j].U_ref_torch = torch.tensor(robots[j].U_ref,dtype=torch.float)                
+                robots[j].U_ref_torch = robots[j].nominal_input_tensor(robots[j].X_torch, torch.tensor(robots[j].X_nominal,dtype=torch.float))  
+                if i>=outer_loop:          
+                    Ut = get_input(robots,j,num_robots, sys_state)
+                else:
+                    Ut = torch.clone( robots[j].U_ref_torch )
                 robots[j].U = Ut.detach().numpy()
             
             robots[j].Xold = robots[j].X
@@ -248,16 +257,17 @@ for i in range(num_steps):
         for j in range(1, num_robots):
             train_x = np.append( train_x, robots[j].Xs.T, axis=1 )
         train_x = train_x[1:,:]
-        train_x = torch.tensor(train_x)
+        train_x = torch.tensor(train_x, dtype=torch.float)
 
         # Predict and solve QPs for two time steps for EACH robot        
         for j in range(num_robots):
             train_y = np.copy(robots[j].Xdots[:,1:].T)
-            train_y = torch.tensor(train_y)   
+            train_y = torch.tensor(train_y, dtype=torch.float)   
             robots[j].gp_x = get_GP_model(train_x, train_y[:,0], likelihood, training_iter)
             robots[j].gp_y = get_GP_model(train_x, train_y[:,1], likelihood, training_iter)
             if robots[j].type=='Unicycle':
                 robots[j].gp_yaw = get_GP_model(train_x, train_y[:,2], likelihood, training_iter)
+            # print("GP made!!")
             
         # Initialization of tensors: get all untouched tensors now
         for j in range(num_robots):
@@ -270,6 +280,10 @@ for i in range(num_steps):
             for k in range(num_robots):
                 robots[k].X_torch = torch.tensor(robots[k].X, requires_grad=True, dtype=torch.float)
                 robots[k].alpha_torch = torch.tensor(robots[k].alpha, requires_grad=True, dtype=torch.float)            
+                if k==0:
+                    sys_state = robots[k].X_torch.T
+                else:
+                    sys_state = torch.cat( (sys_state, robots[k].X_torch.T), 1 )
         
              
             targetX = torch.tensor([ [2.0],[2.0] ], dtype=torch.float)
@@ -279,7 +293,7 @@ for i in range(num_steps):
             robots[j].U_ref_torch = torch.tensor(robots[j].U_ref,dtype=torch.float)
 
             # Step 1
-            Ut = get_input(robots,j,num_robots)
+            Ut = get_input(robots,j,num_robots,sys_state)
             print("updated")
             robots[j].X_torch = robots[j].step_torch( robots[j].X_torch,Ut, dt_outer )
             reward1 = robots[j].compute_reward(robots[j].X_torch, targetX)
@@ -288,8 +302,8 @@ for i in range(num_steps):
             robots[j].U_ref = np.array([0.0,0.0]).reshape(-1,1)
             robots[j].U_ref_torch = torch.tensor(robots[j].U_ref,dtype=torch.float)
             
-            # Step 2
-            Utplus1 = get_input(robots,j,num_robots)
+            # Step 2: need expectation here. need major changes
+            Utplus1 = get_input(robots,j,num_robots,sys_state)
             robots[j].X_torch = robots[j].step_torch( robots[j].X_torch,Utplus1, dt_outer )
             reward2 = robots[j].compute_reward(robots[j].X_torch, targetX)                
 
@@ -302,6 +316,7 @@ for i in range(num_steps):
                 
             # Update alpha now
             robots[j].alpha = robots[j].alpha + lr_alpha * alpha_grad.reshape(-1,1)
+            print(f"j:{j}, alpha_grad: {alpha_grad}")
             
     t = t + dt
     tp.append(t)
