@@ -143,6 +143,31 @@ class Unicycle:
         h1 = h
         
         theta = self.X[2,0]
+        s = (self.X[0:2] - agent.X[0:2]).T @ np.array( [np.cos(theta),np.sin(theta)] ).reshape(-1,1)
+        h = h - self.sigma(s)
+        # h = h + self.sigma(s)
+        print(f"h1:{h1}, h2:{h}")
+        # assert(h1<0)
+        der_sigma = self.sigma_der(s)
+        # dh_dxi = np.append( -2*( self.X[0:2] - agent.X[0:2] ).T - der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) ),  + der_sigma * ( np.cos(theta)*( self.X[0,0]-agent.X[0,0] ) - np.sin(theta)*( self.X[1,0] - agent.X[1,0] ) ) , axis=1)
+        # dh_dxi = np.append( -2*( self.X[0:2] - agent.X[0:2] ).T + der_sigma * ( np.array([ [np.cos(theta), np.sin(theta)] ]) ),  + der_sigma * ( -np.sin(theta)*( self.X[0,0]-agent.X[0,0] ) + np.cos(theta)*( self.X[1,0] - agent.X[1,0] ) ) , axis=1)
+        dh_dxi = np.append( -2*( self.X[0:2] - agent.X[0:2] ).T - der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) ),  - der_sigma * ( np.cos(theta)*( self.X[0,0]-agent.X[0,0] ) - np.sin(theta)*( self.X[1,0] - agent.X[1,0] ) ) , axis=1)
+        
+        if agent.type=='SingleIntegrator2D':
+            dh_dxj = 2*( self.X[0:2] - agent.X[0:2] ).T
+        elif agent.type=='Unicycle':
+            dh_dxj = np.append( -2*( self.X[0:2] - agent.X[0:2] ).T + der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) ), np.array([[0]]), axis=1 )
+        else:
+            dh_dxj = 2*( self.X[0:2] - agent.X[0:2] ).T
+        
+        return h, dh_dxi, dh_dxj
+    
+    def agent_connectivity(self,agent,d_max):
+        beta = 1.01
+        h = np.linalg.norm(self.X[0:2] - agent.X[0:2])**2 - beta*d_max**2
+        h1 = h
+        
+        theta = self.X[2,0]
         s = (self.X[0:2] - agent.X[0:2]).T @ np.array( [np.sin(theta),np.cos(theta)] ).reshape(-1,1)
         h = h - self.sigma(s)
         # print(f"h1:{h1}, h2:{h}")

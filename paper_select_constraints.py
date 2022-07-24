@@ -37,7 +37,7 @@ ax.set_ylabel("Y")
 
 
 num_adversaries = 0
-num_obstacles = 3
+num_obstacles = 2
 alpha = 0.1
 
 default_plot = False
@@ -66,24 +66,24 @@ U_nominal = np.zeros((2,num_robots))
 
 # Uncooperative
 greedy = []
-greedy.append( SingleIntegrator2D(np.array([0,4]), dt, ax, color='r',palpha=1.0) )
-greedy.append( SingleIntegrator2D(np.array([0,5]), dt, ax, color='r',palpha=1.0) )
-greedy.append( SingleIntegrator2D(np.array([7,7]), dt, ax, color='r',palpha=1.0) )
+# greedy.append( SingleIntegrator2D(np.array([0,4]), dt, ax, color='r',palpha=1.0) )
+# greedy.append( SingleIntegrator2D(np.array([0,5]), dt, ax, color='r',palpha=1.0) )
+# greedy.append( SingleIntegrator2D(np.array([7,7]), dt, ax, color='r',palpha=1.0) )
 
-greedy_default = []
-greedy_default.append( SingleIntegrator2D(np.array([0,4]), dt, ax, color='r',palpha=1.0, plot=default_plot) )
-greedy_default.append( SingleIntegrator2D(np.array([0,5]), dt, ax, color='r',palpha=1.0, plot=default_plot) )
-greedy_default.append( SingleIntegrator2D(np.array([7,7]), dt, ax, color='r',palpha=1.0, plot=default_plot) )
+# greedy_default = []
+# greedy_default.append( SingleIntegrator2D(np.array([0,4]), dt, ax, color='r',palpha=1.0, plot=default_plot) )
+# greedy_default.append( SingleIntegrator2D(np.array([0,5]), dt, ax, color='r',palpha=1.0, plot=default_plot) )
+# greedy_default.append( SingleIntegrator2D(np.array([7,7]), dt, ax, color='r',palpha=1.0, plot=default_plot) )
 
-greedy_nominal = []
-greedy_nominal.append( SingleIntegrator2D(np.array([0,4]), dt, ax, color='r',palpha=alpha) )
-greedy_nominal.append( SingleIntegrator2D(np.array([0,5]), dt, ax, color='r',palpha=alpha) )
-greedy_nominal.append( SingleIntegrator2D(np.array([7,7]), dt, ax, color='r',palpha=alpha) )
+# greedy_nominal = []
+# greedy_nominal.append( SingleIntegrator2D(np.array([0,4]), dt, ax, color='r',palpha=alpha) )
+# greedy_nominal.append( SingleIntegrator2D(np.array([0,5]), dt, ax, color='r',palpha=alpha) )
+# greedy_nominal.append( SingleIntegrator2D(np.array([7,7]), dt, ax, color='r',palpha=alpha) )
 
 obstacles = []
-obstacles.append( circle( 1.8,2.5,1.0,ax,0 ) ) # x,y,radius, ax, id
-obstacles.append( circle( 4.2,2.5,1.0,ax,1 ) )
-obstacles.append( circle( 6.2,2.5,1.0,ax,2 ) )
+obstacles.append( circle( 1.6,2.5,1.0,ax,0 ) ) # x,y,radius, ax, id
+obstacles.append( circle( 4.4,2.5,1.0,ax,1 ) )
+# obstacles.append( circle( 6.2,2.5,1.0,ax,2 ) )
 
 # plt.ioff()
 # plt.show()
@@ -444,7 +444,7 @@ with writer.saving(fig, movie_name, 100):
         fig.canvas.draw()
         fig.canvas.flush_events()
         
-        # writer.grab_frame()
+        writer.grab_frame()
     
 plt.ioff()   
 
