@@ -20,6 +20,8 @@ class Unicycle:
         self.dt = dt
         self.id = id
         
+        self.X_torch = []
+        
         self.U = np.array([0,0]).reshape(-1,1)
         self.x_dot_nominal = np.array([ [0],[0],[0] ])
         self.U_ref = np.array([0,0]).reshape(-1,1)
@@ -42,6 +44,7 @@ class Unicycle:
         
         
         self.alpha = alpha*np.ones((num_robots,1))
+        self.alpha_torch = []
         # for Trust computation
         self.adv_alpha =  alpha*np.ones((1,num_adversaries))# alpha*np.ones((1,num_adversaries))
         self.trust_adv = np.ones((1,num_adversaries))

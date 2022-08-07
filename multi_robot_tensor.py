@@ -11,7 +11,7 @@ from matplotlib.animation import FFMpegWriter
 from cvxpylayers.torch import CvxpyLayer
 import gpytorch
 
-plt.rcParams.update({'font.size': 27})
+
 
 # Learning algorithm for each step  ##############################################################
 class GPModel(gpytorch.models.ExactGP):

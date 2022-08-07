@@ -15,6 +15,11 @@ class SingleIntegrator2D:
         self.identity = identity   
         self.target = target
         
+        ## GP  ######
+        self.gp_x = []
+        self.gp_y = []
+        ###########
+        
         X0 = X0.reshape(-1,1)
         self.X = X0
         self.X_nominal = np.copy(self.X)
