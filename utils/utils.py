@@ -28,6 +28,15 @@ def euler_rate_matrix(phi,theta,psi):
                       [ 0,  np.cos(phi)              , -np.sin(phi) ],
                       [ 0,  np.sin(phi)/np.cos(theta), np.cos(phi)*np.sin(theta) ] ] )
     
+# Helper Functions to solve QP #####################################################################
+def getGrad(param):
+            if param.grad==None:
+                print("Grad NONE")
+                return 0
+            value = param.grad.detach().numpy()
+            param.grad = None
+            return value  
+        
     
 # def compute_trust(A,b,uj,uj_nominal,h,min_dist):
     
