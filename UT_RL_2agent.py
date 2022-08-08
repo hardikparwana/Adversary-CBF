@@ -14,42 +14,44 @@ from utils.utils import *
 from utils.ut_utils import *
 
 # Learning algorithm for each step  ##############################################################
-class GPModel(gpytorch.models.ExactGP):
+class MultitaskGPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood):
-        super(GPModel, self).__init__(train_x, train_y, likelihood)
-        self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+        super(MultitaskGPModel, self).__init__(train_x, train_y, likelihood)
+        self.mean_module = gpytorch.means.MultitaskMean(
+            gpytorch.means.ConstantMean(), num_tasks=2
+        )
+        self.covar_module = gpytorch.kernels.MultitaskKernel(
+            gpytorch.kernels.RBFKernel(), num_tasks=2, rank=1
+        )
 
     def forward(self, x):
         mean_x = self.mean_module(x)
         covar_x = self.covar_module(x)
-        return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
-    
+        return gpytorch.distributions.MultitaskMultivariateNormal(mean_x, covar_x)
+
 # initialize likelihood and model
-likelihood = gpytorch.likelihoods.GaussianLikelihood()
-# "Loss" for GPs - the marginal log likelihood
+likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=2)
+#model = MultitaskGPModel(train_x, train_y, likelihood)
+
 training_iter = 10
 
-def get_GP_model(train_x, train_y, likelihood, training_iter):
+def get_GP_model( train_x, train_y, likelihood, training_iter ):
     
-    model = GPModel(train_x, train_y, likelihood)
+    model = MultitaskGPModel(train_x, train_y, likelihood)
     # Use the adam optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)  # Includes GaussianLikelihood parameters
     model.train()
     likelihood.train()
+
+    # "Loss" for GPs - the marginal log likelihood
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+
     for i in range(training_iter):
-        
-        # Zero gradients from previous iteration
         optimizer.zero_grad()
-        
-        # Output from model
         output = model(train_x)
-        
-        # Calc loss and backprop gradients
         loss = -mll(output, train_y)
         loss.backward()
-        # print('Iter %d/%d - Loss: %.3f   lengthscale: %.3f   noise: %.3f' % (i + 1, training_iter, loss.item(), model.covar_module.base_kernel.lengthscale.item(), model.likelihood.noise.item() ))
+        print('Iter %d/%d - Loss: %.3f' % (i + 1, training_iter, loss.item()))
         optimizer.step()
     model.eval()
     likelihood.eval()
@@ -115,6 +117,8 @@ def get_future_reward( follower, leader, num_sigma_points ):
     prior_leader_states, prior_leader_weights = initialize_sigma_points(leader, num_sigma_points)
     leader_states = [prior_leader_states]
     leader_weights = [prior_leader_weights]
+
+    reward = torch.tensor([0],dtype=torch.float)
     
     for i in range(H):       
         
@@ -130,8 +134,8 @@ def get_future_reward( follower, leader, num_sigma_points ):
         u_ref = follower.nominal_input_tensor( follower_states[i], leader_mean_position )
         
         # get CBF solution
-        solution = cbf_controller_layer( u_ref, A, B )
-        
+        solution,  = cbf_controller_layer( u_ref, A, B )
+        A.sum().backward(retain_graph=True)
         # Propagate follower and leader state forward
         follower_states.append( follower.step_torch( follower_states[i], solution, dt_outer ) )
         
@@ -139,13 +143,18 @@ def get_future_reward( follower, leader, num_sigma_points ):
         leader_next_states, leader_next_weights = sigma_point_compress( leader_next_state_expanded, leader_xdot_weights )
         leader_states.append( leader_next_states ); leader_weights.append( leader_next_weights )
         
-        # Get reward for this state and control input choice
+        # Get reward for this state and control input choice = Expected reward in general settings
+        reward_function = lambda a, b: follower.compute_reward(a, b, des_d = 0.7)
+        reward = reward + UT_Mean_Evaluator_basic( reward_function, follower_states[i+1], leader_states[i+1], leader_weights[i+1])
+        
+    print("forward prop done!")
+    return reward
         
 ################################################################
 
 # Sim Parameters
 num_steps = 100
-H = 10
+H = 3
 outer_loop = 5
 t = 0
 gp_training_iter = 10
@@ -188,11 +197,12 @@ for i in range(num_steps):
         train_x = torch.tensor( np.append( np.copy(follower.Xs.T), np.copy(leader.Xs.T) , axis = 1  ), dtype=torch.float )
         train_y = torch.tensor( np.copy(leader.Xdots.T) , dtype=torch.float )
         # shuffle data??  TODO
-        leader.gp_x = get_GP_model( train_x, train_y[:,0], likelihood, gp_training_iter )
-        leader.gp_y = get_GP_model( train_x, train_y[:,1], likelihood, gp_training_iter )
+        leader.gp = get_GP_model( train_x, train_y, likelihood, gp_training_iter )
         
-        reward = get_future_reward( follower, leader, num_sigma_points = 3 )
-        reward.sum().backward()
+        objective_tensor = torch.tensor(0,requires_grad=True, dtype=torch.float)
+        reward = get_future_reward( follower, leader, num_sigma_points = 1 )
+
+        reward.backward(retain_graph=True)
         
         alpha_grad = getGrad( follower.alpha_torch )
         follower.alpha = follower.alpha + lr_alpha * alpha_grad.reshape(-1,1)
