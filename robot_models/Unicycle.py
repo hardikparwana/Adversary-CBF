@@ -4,7 +4,7 @@ from utils.utils import wrap_angle, wrap_angle_tensor
 
 class Unicycle:
     
-    def __init__(self,X0,dt,ax,id,num_robots=1,num_adversaries = 1, alpha=0.8,color='r',palpha=1.0,plot=True, identity='nominal'):
+    def __init__(self,X0,dt,ax,id,num_robots=1, d_min = 0.3, num_adversaries = 1, alpha=0.8,color='r',palpha=1.0,plot=True, identity='nominal'):
         '''
         X0: iniytial state
         dt: simulation time step
@@ -19,6 +19,8 @@ class Unicycle:
         self.X_nominal = np.copy(self.X)
         self.dt = dt
         self.id = id
+        
+        self.d_min = d_min
         
         self.X_torch = []
         
@@ -44,7 +46,7 @@ class Unicycle:
         
         
         self.alpha = alpha*np.ones((num_robots,1))
-        self.alpha_torch = []
+        self.alpha_torch = torch.tensor(alpha, dtype=torch.float, requires_grad=True)
         # for Trust computation
         self.adv_alpha =  alpha*np.ones((1,num_adversaries))# alpha*np.ones((1,num_adversaries))
         self.trust_adv = np.ones((1,num_adversaries))
@@ -265,6 +267,6 @@ class Unicycle:
         
         return h_final, dh_dxi, dh_dxj
     
-    def compute_reward(self,X,targetX):
-        return torch.square( torch.norm( X[0:2,0] - targetX[0:2,0]  ) )
+    def compute_reward(self,X,targetX, des_d = 0.7):
+        return torch.square( torch.norm( X[0:2,0] - targetX[0:2,0]  ) - torch.tensor(des_d) )
     

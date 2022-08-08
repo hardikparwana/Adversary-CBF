@@ -15,13 +15,17 @@ class MatrixSquareRoot(Function):
     def forward(ctx, input):
         m = input.detach().cpu().numpy().astype(np.float_)
         sqrtm = torch.from_numpy(scipy.linalg.sqrtm(m).real).to(input)
-        ctx.save_for_backward(sqrtm)
+        ctx.save_for_backward(torch.clone(sqrtm))
+        print("SQRTM forward", sqrtm)
         return sqrtm
 
     @staticmethod
     def backward(ctx, grad_output):
         grad_input = None
+        print("inside backprop")
         if ctx.needs_input_grad[0]:
+            print("inside backprop 2")
+            print("SQRTM", ctx.saved_tensors)
             sqrtm, = ctx.saved_tensors
             sqrtm = sqrtm.data.cpu().numpy().astype(np.float_)
             gm = grad_output.data.cpu().numpy().astype(np.float_)
@@ -43,6 +47,7 @@ def main():
     k = torch.randn(20, 10).double()
     # Create a positive definite matrix
     pd_mat = (k.t().matmul(k)).requires_grad_()
+    print(sqrtm(pd_mat).shape)
     test = gradcheck(sqrtm, (pd_mat,))
     print(test)
 
