@@ -97,7 +97,7 @@ def compute_trust(A,b,uj,uj_nominal,h,min_dist,h_min):
     assert(h_dist>0)
     
     # rho_dist and rho_theta both positive
-    print(f"rho_dist:{rho_dist}, h:{h}, h_min:{h_min} ")
+    # print(f"rho_dist:{rho_dist}, h:{h}, h_min:{h_min} ")
     # if rho_dist>min_dist: # always positive
     #     # trust = 2*rho_theta*(rho_dist-min_dist)/h_eff
     #     trust = 2*rho_theta*(rho_dist-min_dist)/h_dist
