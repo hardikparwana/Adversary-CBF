@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from utils.sqrtm import sqrtm
+from utils.identity_map import identity
 
 def get_mean_cov(sigma_points, weights, compute_cov=True):
     
@@ -42,10 +43,17 @@ def sigma_point_expand(robot_state, sigma_points, weights, leader):
     new_weights = []#np.array([0])
     for i in range(N):
         #get GP gaussian
-        sys_state = torch.cat( (robot_state.T, sigma_points[:,i].reshape(-1,1).T), 1 )
-        pred = leader.gp( sys_state ) # all are tensors here
+        # sys_state = torch.autograd.Variable(torch.cat( (robot_state.T, sigma_points[:,i].reshape(-1,1).T), 1 ), requires_grad=True)
+        sys_state = identity( torch.cat( (robot_state.T, sigma_points[:,i].reshape(-1,1).T), 1 ) )
+        # sys_state = torch.cat( (robot_state.T, sigma_points[:,i].reshape(-1,1).T), 1 )
+        # sys_state.retain_grad()
+        pred = leader.likelihood(leader.gp( sys_state )) # all are tensors here
         mu = pred.mean.reshape(-1,1)# torch.cat( (pred_x.mean, pred_y.mean), 0 )
         cov = pred.covariance_matrix # = torch.diag( torch.cat( pred_x.covariance_matrix, pred_y.covariance_matrix, 1 ) )
+        
+        # mu = torch.tensor([[0.5],[0.5]]) * torch.norm( sys_state )
+        # cov = torch.tensor([[0.0181, 0.0064],
+        # [0.0064, 0.0282]])
         
         k = n - 3
         root_term = sqrtm((n+k)*cov)

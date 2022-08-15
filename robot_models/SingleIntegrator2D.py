@@ -18,6 +18,8 @@ class SingleIntegrator2D:
         ## GP  ######
         self.gp_x = []
         self.gp_y = []
+        self.gp = []
+        self.likelihood = []
         ###########
         
         X0 = X0.reshape(-1,1)
