@@ -16,13 +16,13 @@ class MatrixSquareRoot(Function):
         m = input.detach().cpu().numpy().astype(np.float_)
         sqrtm = torch.from_numpy(scipy.linalg.sqrtm(m).real).to(input)
         ctx.save_for_backward(torch.clone(sqrtm))
-        print("SQRTM forward", sqrtm)
+        # print("SQRTM forward", sqrtm)
         return sqrtm
 
     @staticmethod
     def backward(ctx, grad_output):
         grad_input = None
-        print("inside backprop")
+        # print("inside backprop")
         if ctx.needs_input_grad[0]:
             print("inside backprop 2")
             print("SQRTM", ctx.saved_tensors)

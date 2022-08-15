@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FFMpegWriter
 plt.rcParams.update({'font.size': 27})
+import sys
+sys.path.append('/home/hardik/Desktop/Research/Adversary-CBF/gpytorch')
 
 import cvxpy as cp
 from cvxpylayers.torch import CvxpyLayer
@@ -55,7 +57,7 @@ def get_GP_model( train_x, train_y, likelihood, training_iter ):
         optimizer.step()
     model.eval()
     likelihood.eval()
-    return model
+    return model, likelihood
 
 #############################################################
 # CBF Controller: centralized
@@ -64,7 +66,7 @@ u1_ref = cp.Parameter((2,1),value = np.zeros((2,1)) )
 num_constraints1 = 1
 A1 = cp.Parameter((num_constraints1,2),value=np.zeros((num_constraints1,2)))
 b1 = cp.Parameter((num_constraints1,1),value=np.zeros((num_constraints1,1)))
-const1 = [A1 @ u1 <= b1]
+const1 = [A1 @ u1 + b1 <= 0]
 objective1 = cp.Minimize( cp.sum_squares( u1 - u1_ref  ) )
 cbf_controller = cp.Problem( objective1, const1 )
 assert cbf_controller.is_dpp()
@@ -164,6 +166,7 @@ dt_inner = 0.05
 dt_outer = 0.1
 alpha_cbf = 0.8   # Initial CBF
 num_robots = 1
+lr_alpha = 0.05
 
 # Plotting             
 plt.ion()
@@ -172,14 +175,14 @@ ax = plt.axes(xlim=(0,7),ylim=(-0.5,8))
 ax.set_xlabel("X")
 ax.set_ylabel("Y")
 
-follower = Unicycle(np.array([3,1.5,np.pi/2]), dt_inner, ax, num_robots=num_robots, id = 0, color='g',palpha=1.0, alpha=alpha_cbf )
-leader = SingleIntegrator2D(np.array([0,4]), dt_inner, ax, color='r',palpha=1.0, target = 0)
+follower = Unicycle(np.array([0,0,np.pi*0.0]), dt_inner, ax, num_robots=num_robots, id = 0, color='g',palpha=1.0, alpha=alpha_cbf )
+leader = SingleIntegrator2D(np.array([1,0]), dt_inner, ax, color='r',palpha=1.0, target = 0)
 
 for i in range(num_steps):
 
     # High frequency
     if i % outer_loop != 0 or i<10:
-        
+        # print("follower alpha fast", follower.alpha)
         # move other agent
         u_leader = np.array([ 1,1 ]).reshape(-1,1)
         leader.step(u_leader, dt_inner)
@@ -187,6 +190,7 @@ for i in range(num_steps):
         # implement controller
         initialize_tensors(follower, leader)
         u_follower = get_follower_input(follower, leader)
+        # print("u_follower",u_follower)
         follower.step(u_follower.detach().numpy(), dt_inner)
         
         t = t + dt_inner
@@ -197,7 +201,9 @@ for i in range(num_steps):
         train_x = torch.tensor( np.append( np.copy(follower.Xs.T), np.copy(leader.Xs.T) , axis = 1  ), dtype=torch.float )
         train_y = torch.tensor( np.copy(leader.Xdots.T) , dtype=torch.float )
         # shuffle data??  TODO
-        leader.gp = get_GP_model( train_x, train_y, likelihood, gp_training_iter )
+        model, likelihood = get_GP_model( train_x, train_y, likelihood, gp_training_iter )
+        leader.gp = model
+        leader.likelihood = likelihood
         
         objective_tensor = torch.tensor(0,requires_grad=True, dtype=torch.float)
         reward = get_future_reward( follower, leader, num_sigma_points = 1 )
@@ -205,6 +211,10 @@ for i in range(num_steps):
         reward.backward(retain_graph=True)
         
         alpha_grad = getGrad( follower.alpha_torch )
+        if abs(alpha_grad)>0.1:
+            alpha_grad = np.sign(alpha_grad) * 0.3
+        # print("alpha grad", alpha_grad)
         follower.alpha = follower.alpha + lr_alpha * alpha_grad.reshape(-1,1)
+        # print("follower alpha", follower.alpha)
 
     
