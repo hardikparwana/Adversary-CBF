@@ -84,7 +84,7 @@ def initialize_tensors(follower, leader):
 def compute_A1_b1_tensor(robotsJ, robotsK, alpha, d_min, sys_state):
     h, dh_dxj, dh_dxk = robotsJ.agent_barrier_torch(robotsJ.X_torch, robotsK.X_torch, d_min, robotsK.type)
     A1 = dh_dxj @ robotsJ.g_torch(robotsJ.X_torch)
-
+    
     if robotsK.gp_x == []:
         if robotsK.type=='Unicycle':
             x_dot_k = torch.tensor([0,0,0],dtype=torch.float).reshape(-1,1)
