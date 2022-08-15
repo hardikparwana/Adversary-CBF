@@ -83,6 +83,8 @@ gp.get_obs_covariance()
 # axis1[1].plot( train_x[0], ys[:,1], 'g', label='Trained Predicted Mean' )
 # axis1[1].fill_between( train_x[0], ys[:,1] - factor * covs[:,1], ys[:,1] + factor * covs[:,1], color="tab:blue", alpha=0.2 )
 
+# Pytorch tensor prediction test
+
 gp.initialize_torch()
 train_x_tensor = torch.tensor(train_x)
 
