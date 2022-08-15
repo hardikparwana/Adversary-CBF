@@ -61,25 +61,6 @@ class MVGP:
         """
         self.X = X
         self.Y = Y
-    
-    # Evaluate kernel (squared exponential)
-    def evaluate_kernel(self, x1, x2):
-        diff = np.linalg.norm(x1 - x2)
-        return self.sigma**2 * np.exp(-diff**2 / (2*self.l**2))
-
-    # Add observed data to GP
-    # def add_data(self, x, y):
-    #     self.X_obs.append(np.copy(x))
-    #     self.Y_obs.append(np.copy(y))
-    #     if (len(self.X_obs) != len(self.Y_obs)):
-    #         print("ERROR: Input/output data dimensions don't match")
-    #     if (len(self.X_obs) > self.horizon):
-    #         self.X_obs.pop(0)
-    #         self.Y_obs.pop(0)
-    #     self.N_data = len(self.X_obs)
-    #     self.count += 1
-    #     if (self.count >= self.horizon):
-    #         self.count = 0
             
     def add_data(self, x, y):
         self.X.append(np.copy(x))
@@ -93,12 +74,25 @@ class MVGP:
         self.count += 1
         if (self.count >= self.horizon):
             self.count = 0
+            
+    # select a subset for predictions
+    def resample_obs( self, n_samples=80, start_index = 0 ):
+        N = self.X.shape[0]
+        idx = random.sample(range(0, N), min(n_samples, N))
+        self.X_obs, self.Y_obs = self.X[idx,:], self.Y[idx,:]
+        self.N_data = self.X_obs.shape[0]
+        return self.X_obs, self.Y_obs
 
+        # Evaluate kernel (squared exponential)
+    def evaluate_kernel(self, x1, x2):
+        diff = np.linalg.norm(x1 - x2)
+        return self.sigma**2 * np.exp(-diff**2 / (2*self.l**2))
+    
     # Get K*
     def get_X_cov(self, Xnew):
         N = self.N_data
         for i in range(N):
-            self.K_star[i] = self.evaluate_kernel(self.X_obs[i], Xnew)
+            self.K_star[i] = self.evaluate_kernel(self.X_obs[i,:], Xnew)
         return self.K_star[0:N]
 
     # Get covariance matrix given current dataset
@@ -107,7 +101,7 @@ class MVGP:
         K = np.empty((N, N))
         for i in range(N):
             for j in range(i, N):
-                val = self.evaluate_kernel(self.X_obs[i], self.X_obs[j])
+                val = self.evaluate_kernel(self.X_obs[i,:], self.X_obs[j,:])
                 if (i == j):
                     K[i, i] = val + self.noise
                 else:
@@ -119,9 +113,9 @@ class MVGP:
     # Update covariance matrix given new data (run after add_data)
     def update_obs_covariance(self):
         N = self.N_data
-        x = self.X_obs[-1]
+        x = self.X_obs[-1,:]
         for i in range(N):
-            val = self.evaluate_kernel(x, self.X_obs[i])
+            val = self.evaluate_kernel(x, self.X_obs[i,:])
             if (i == N-1):
                 self.K_obs[N-1, N-1] = val + self.noise
             else:
@@ -129,44 +123,39 @@ class MVGP:
                 self.K_obs[N-1, i] = val
         return self.K_obs[0:N, 0:N]
 
-    '''
-    # Get covariance matrix given current dataset
-    def update_obs_covariance(self):
-        N = self.N_data
-        for i in range(N):
-            val = self.evaluate_kernel(self.X_obs[self.count], self.X_obs[i])
-            if (self.count == i):
-                self.K_obs[i, i] = val + self.noise
-            else:
-                self.K_obs[i, self.count] = val
-                self.K_obs[self.count, i] = val
-        return self.K_obs[0:N,0:N]
-    '''
-
     # Predict function at new point Xnew
     def predict(self, Xnew):
         N = self.N_data
         # K = self.get_covariance()
         K_inv = np.linalg.inv(self.K_obs[0:N,0:N])
         k_star = self.get_X_cov(Xnew)
-        mean = np.matmul(np.transpose(np.matmul(K_inv, k_star)), self.Y_obs[0:N])
-        Sigma = self.evaluate_kernel(Xnew, Xnew) + self.noise - np.matmul(np.transpose(np.matmul(K_inv, k_star)), k_star)
+        
+        mean = (K_inv @ k_star).T @ self.Y_obs #np.matmul(np.transpose(np.matmul(K_inv, k_star)), self.Y_obs[0:N])
+        Sigma = self.evaluate_kernel(Xnew, Xnew) + self.noise -  (K_inv @ k_star).T @ k_star
+        
+        # mean = np.matmul(np.transpose(np.matmul(K_inv, k_star)), self.Y_obs[0:N])
+        # Sigma = self.evaluate_kernel(Xnew, Xnew) + self.noise - np.matmul(np.transpose(np.matmul(K_inv, k_star)), k_star)
         cov = np.kron(Sigma, self.omega)
         return mean.reshape(1,-1), cov
     
+    # for prediction in torch
     def initialize_torch(self):
         self.K_obs_torch = torch.tensor(self.K_obs, dtype = torch.float )
-        self.Y_obs_torch = torch.tensor( self.Y_obs_torch, dtype = torch.float )
-        self.K_star_torch = torch.tensor( (1,self.N_data), dtype=torch.float )
+        self.Y_obs_torch = torch.tensor( self.Y_obs, dtype = torch.float )
+        self.X_obs_torch = torch.tensor( self.X_obs, dtype=torch.float )
+        self.K_star_torch = torch.zeros( (self.N_data,1), dtype=torch.float )
+        self.omega_torch = torch.tensor( self.omega, dtype=torch.float )
+        self.l_torch = torch.tensor( self.l, dtype=torch.float )
+        self.sigma_torch = torch.tensor( self.sigma, dtype=torch.float )
         
     def evaluate_kernel_torch(self, x1, x2):
         diff = torch.norm(x1 - x2)
-        return self.sigma**2 * torch.exp(-diff**2 / (2*self.l**2))
+        return self.sigma_torch**2 * torch.exp(-diff**2 / (2*self.l_torch**2))
         
     def get_X_cov_torch(self,Xnew):
         N = self.N_data
         for i in range(N):
-            self.K_star_torch[0,i] = self.evaluate_kernel_torch(self.X_obs_torch[i], Xnew)
+            self.K_star_torch[i,0] = self.evaluate_kernel_torch(self.X_obs_torch[i,:], Xnew)
         return self.K_star_torch
     
     def predict_torch(self, Xnew):
@@ -174,10 +163,12 @@ class MVGP:
         # K = self.get_covariance()
         K_inv = torch.inverse(self.K_obs_torch[0:N,0:N])
         k_star = self.get_X_cov_torch(Xnew)
-        mean = np.transpose(np.matmul(K_inv, k_star)) @ self.Y_obs_torch[0:N]
-        Sigma = self.evaluate_kernel_torch(Xnew, Xnew) + self.noise - np.matmul(np.transpose(np.matmul(K_inv, k_star)), k_star)
-        cov = torch.kron(Sigma, self.omega)
+        mean =  (K_inv @ k_star).T @ self.Y_obs_torch
+        Sigma = self.evaluate_kernel_torch(Xnew, Xnew) + self.noise -  (K_inv @ k_star).T @ k_star
+        cov = torch.kron(Sigma, self.omega_torch)
         return mean, cov
+    
+    # For TRAINING
     
      # Sample subset of data for gradient computation
     def resample(self, n_samples=80, start_index = 0):
@@ -185,23 +176,6 @@ class MVGP:
         idx = random.sample(range(0, N), min(n_samples, N))
         self.X_s, self.Y_s = self.X[idx,:], self.Y[idx,:]
         return self.X_s, self.Y_s
-    
-    def resample_obs( self, n_samples=80, start_index = 0 ):
-        N = self.X.shape[0]
-        idx = random.sample(range(0, N), min(n_samples, N))
-        self.X_obs, self.Y_obs = self.X[idx,:], self.Y[idx,:]
-        self.N_data = self.X_obs.shape[0]
-        return self.X_obs, self.Y_obs
-
-    # Set/update input data for model
-    def set_XY(self, X, Y):
-        self.X = X
-        self.Y = Y
-    
-    # Evaluate kernel (squared exponential)
-    def evaluate_kernel(self, x1, x2):
-        diff = np.linalg.norm(x1 - x2)
-        return self.sigma**2 * np.exp(-diff**2 / (2*self.l**2))
 
     # Evaluate derivative of kernel (w.r.t. length scale)
     def dk_dl(self, x1, x2):
@@ -260,7 +234,8 @@ class MVGP:
         
         iter = 1
         Ns = self.X_s.shape[0]
-        while ( L < -0.001 and iter<20 ):
+        while ( L < -0.001 and iter<10 ):
+            self.resample( int(np.floor( 4.0*Ns/5 )) )
             K = self.get_covariance()            
                 
             Kinv = np.linalg.inv(K)
@@ -298,16 +273,7 @@ class MVGP:
         return L
     
 
-    def train(self, max_iters = 100):
-        # Initialize GP with random hyperparameters
-        # d = 2
-        # L_init = 0.2*(np.random.rand(d,d) - 0.5)
-        # L_init = np.eye(d) + np.tril(L_init)
-        # omega_init = np.matmul(L_init, np.transpose(L_init))
-        # D,V = np.linalg.eig(omega_init)
-        # self.l = 10.0 + 70.0*np.random.rand()
-        # self.sigma = 8.0 + 16.0*np.random.rand()
-        # self.omega = omega_init
+    def train(self, n_samples = 100, max_iters = 100):
 
         # Define gradient descent parameters
         vals = []
@@ -328,7 +294,7 @@ class MVGP:
                 rate = 0.0002
 
             # Get Gradients
-            self.resample( n_samples = 100 )
+            self.resample( n_samples = n_samples )
             dL_dl, dL_ds, dL_domega = self.likelihood_gradients()
             dL_domega = (dL_domega + np.transpose(dL_domega))/2
             dL_dl = np.clip(dL_dl, -grad_max, grad_max)
@@ -352,7 +318,6 @@ class MVGP:
                 cur_s = cur_s - rate * dL_ds
             else:
                 print("Error in parameter update")
-
 
             # sigma cannot be negative so constrain it
             if cur_s < 0:
@@ -386,6 +351,3 @@ class MVGP:
             # Save parameters and likelihoods
             if (iters % 10 == 0):
                 print(f"Iteration: {iters}, Likelihood for this dataset: {value}, grads: {dL_dl}, {dL_ds}, {dL_domega}")
-            # if (iters % 50 == 0 and kSave):
-            #     np.save('likelihood_vals_human_v' + str(iteration), vals)
-            #     np.save('parameters_human_v' + str(iteration), [params_omega, params_sigma, params_l])
