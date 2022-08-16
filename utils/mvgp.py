@@ -18,7 +18,7 @@ class MVGP:
         If normalizer is False, no normalization will be done.
     .. Note:: Multiple independent outputs are allowed using columns of Y
     """
-    def __init__(self, X, Y, kernel='SE', omega=None, l=None, sigma=1.0, noise=None, horizon=20):
+    def __init__(self, X = [], Y = [], kernel='SE', omega=None, l=None, sigma=1.0, noise=None, horizon=20):
         self.X = X
         self.Y = Y
         self.X_s = X
@@ -42,6 +42,8 @@ class MVGP:
         self.K_star_torch = torch.zeros(horizon, dtype=torch.float)
         self.Y_obs_torch = []
         self.X_obs_torch = []
+        
+        self.kstars = []
 
     def load_parameters(self, file_name):
         # open a file, where you stored the pickled data
@@ -129,7 +131,7 @@ class MVGP:
         # K = self.get_covariance()
         K_inv = np.linalg.inv(self.K_obs[0:N,0:N])
         k_star = self.get_X_cov(Xnew)
-        
+        self.kstars.append(k_star)
         mean = (K_inv @ k_star).T @ self.Y_obs #np.matmul(np.transpose(np.matmul(K_inv, k_star)), self.Y_obs[0:N])
         Sigma = self.evaluate_kernel(Xnew, Xnew) + self.noise -  (K_inv @ k_star).T @ k_star
         
@@ -147,6 +149,8 @@ class MVGP:
         self.omega_torch = torch.tensor( self.omega, dtype=torch.float )
         self.l_torch = torch.tensor( self.l, dtype=torch.float )
         self.sigma_torch = torch.tensor( self.sigma, dtype=torch.float )
+        self.K_inv_torch = torch.inverse(self.K_obs_torch)
+        self.kstars = []
         
     def evaluate_kernel_torch(self, x1, x2):
         diff = torch.norm(x1 - x2)
@@ -161,10 +165,16 @@ class MVGP:
     def predict_torch(self, Xnew):
         N = self.N_data
         # K = self.get_covariance()
-        K_inv = torch.inverse(self.K_obs_torch[0:N,0:N])
+        
+        # if N==0:
+        #     return torch.zeros(2), torch.eye(2)
+                
+        # K_inv = torch.inverse(self.K_obs_torch[0:N,0:N])
         k_star = self.get_X_cov_torch(Xnew)
-        mean =  (K_inv @ k_star).T @ self.Y_obs_torch
-        Sigma = self.evaluate_kernel_torch(Xnew, Xnew) + self.noise -  (K_inv @ k_star).T @ k_star
+        mean =  (self.K_inv_torch @ k_star).T @ self.Y_obs_torch
+        
+        # print("**************** called *****************")
+        Sigma = self.evaluate_kernel_torch(Xnew, Xnew) + self.noise - (self.K_inv_torch @ k_star).T @ torch.clone(k_star)
         cov = torch.kron(Sigma, self.omega_torch)
         return mean, cov
     
@@ -174,7 +184,7 @@ class MVGP:
     def resample(self, n_samples=80, start_index = 0):
         N = self.X.shape[0]
         idx = random.sample(range(0, N), min(n_samples, N))
-        self.X_s, self.Y_s = self.X[idx,:], self.Y[idx,:]
+        self.X_s, self.Y_s = self.X[idx], self.Y[idx]
         return self.X_s, self.Y_s
 
     # Evaluate derivative of kernel (w.r.t. length scale)

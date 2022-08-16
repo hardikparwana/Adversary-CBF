@@ -70,8 +70,7 @@ class SingleIntegrator2D:
         self.trust_advs = np.ones((1,num_adversaries))
         self.robot_alphas = alpha*np.ones((1,num_robots))
         self.trust_robots = 1*np.ones((1,num_robots))
-        self.Xs = X0.reshape(-1,1)
-        self.Us = np.array([0,0]).reshape(-1,1)
+        
         self.adv_hs = np.ones((1,num_adversaries))
         self.robot_hs = np.ones((1,num_robots))
         
@@ -80,8 +79,10 @@ class SingleIntegrator2D:
         self.X_org = np.copy(self.X)
         self.U_org = np.copy(self.U)
         
-        self.Xs = np.copy(self.X)
-        self.Xdots = np.array([0,0]).reshape(-1,1)
+        self.Xs = [] #np.copy(self.X)
+        self.Xdots = [] #np.array([0,0]).reshape(-1,1)
+        # self.Xs = X0.reshape(-1,1)
+        self.Us = [] #np.array([0,0]).reshape(-1,1)
         
         
     def f(self):
@@ -98,11 +99,21 @@ class SingleIntegrator2D:
         
     def step(self,U,dt,mode='actual'): #Just holonomic X,T acceleration
 
+        xold = np.copy(self.X)
         self.U = U.reshape(-1,1)
-        self.X = self.X + ( self.f() + self.g() @ self.U )*self.dt
+        self.X = self.X + ( self.f() + self.g() @ self.U ) * dt
+        Xdot = self.f() + self.g() @ self.U
         self.render_plot()
-        # self.Xs = np.append(self.Xs,self.X,axis=1)
-        # self.Us = np.append(self.Us,self.U,axis=1)
+        
+        if self.Xs == []:
+            self.Xs = np.copy(xold)
+            self.Us = np.copy(self.U)
+            self.Xdots = np.copy(Xdot)
+        else:            
+            self.Xs = np.append(self.Xs,xold,axis=1)
+            self.Us = np.append(self.Us,self.U,axis=1)
+            self.Xdots = np.append( self.Xdots, Xdot  , axis=1 )
+        
         return self.X
 
     def render_plot(self):

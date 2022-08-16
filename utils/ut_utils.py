@@ -15,21 +15,32 @@ def get_mean_cov(sigma_points, weights, compute_cov=True):
     centered_points = sigma_points - mu
     weighted_centered_points = centered_points * weights[0] 
     cov = torch.matmul( weighted_centered_points, centered_points.T )
+    
+    # print(f"Checking for Nans: {torch.isnan(cov).any()}")
     return mu, cov
 
-def generate_sigma_points( mu, cov ):
+def generate_sigma_points( mu, cov, num_sigma_points = 1 ):
     # no of points
-    n = mu.shape[0]  # dimension of single vector
+    n = num_sigma_points #mu.shape[0]  # dimension of single vector
     N = 2*n + 1 # total points
     
-    k = n - 3
+    # TODO
+    # k = n - 3
+    k = 1
     root_term = sqrtm((n+k)*cov)
+    
+    if np.linalg.det( cov.detach().numpy() )< 0.01:
+        root_term = cov
+    else:
+        root_term = sqrtm((n+k)*cov)
+    
+    # print(f"cov: {cov}, det: {torch.det(cov)}")
     
     new_points = torch.clone(mu)
     new_points = torch.cat( (new_points, mu - root_term[:,1].reshape(-1,1)), 1 )
     new_points = torch.cat( (new_points, mu + root_term[:,0].reshape(-1,1)), 1 )
     
-    new_weights = torch.tensor([k/n+k]).reshape(-1,1)
+    new_weights = torch.tensor([k/(n+k)]).reshape(-1,1)
     new_weights = torch.cat( (new_weights, torch.tensor(1.0/2/(n+k)).reshape(-1,1)), axis=1 )
     new_weights = torch.cat( (new_weights, torch.tensor(1.0/2/(n+k)).reshape(-1,1)), axis=1 )
             
@@ -44,19 +55,23 @@ def sigma_point_expand(robot_state, sigma_points, weights, leader):
     for i in range(N):
         #get GP gaussian
         # sys_state = torch.autograd.Variable(torch.cat( (robot_state.T, sigma_points[:,i].reshape(-1,1).T), 1 ), requires_grad=True)
-        sys_state = identity( torch.cat( (robot_state.T, sigma_points[:,i].reshape(-1,1).T), 1 ) )
-        # sys_state = torch.cat( (robot_state.T, sigma_points[:,i].reshape(-1,1).T), 1 )
+        # sys_state = identity( torch.cat( (robot_state.T, sigma_points[:,i].reshape(-1,1).T), 1 ) )
+        sys_state = torch.cat( (robot_state.T, sigma_points[:,i].reshape(-1,1).T), 1 )
         # sys_state.retain_grad()
-        pred = leader.likelihood(leader.gp( sys_state )) # all are tensors here
-        mu = pred.mean.reshape(-1,1)# torch.cat( (pred_x.mean, pred_y.mean), 0 )
-        cov = pred.covariance_matrix # = torch.diag( torch.cat( pred_x.covariance_matrix, pred_y.covariance_matrix, 1 ) )
-        
+        mu, cov = leader.gp.predict_torch( sys_state ) # all are tensors here
+        mu = mu.reshape(-1,1)
         # mu = torch.tensor([[0.5],[0.5]]) * torch.norm( sys_state )
         # cov = torch.tensor([[0.0181, 0.0064],
         # [0.0064, 0.0282]])
         
+        # TODO
         k = n - 3
-        root_term = sqrtm((n+k)*cov)
+        root_term =  sqrtm((n+k)*cov)
+        
+        if np.linalg.det( cov.detach().numpy() )< 0.01:
+            root_term = cov
+        else:
+            root_term = sqrtm((n+k)*cov)
         
         # Now get 3 points
         if new_points==[]:
@@ -65,7 +80,6 @@ def sigma_point_expand(robot_state, sigma_points, weights, leader):
             new_points = torch.cat((new_points, mu), axis=1 )
         new_points = torch.cat((new_points, mu - root_term[:,0].reshape(-1,1)), axis=1 )
         new_points = torch.cat((new_points, mu + root_term[:,1].reshape(-1,1)), axis=1 )
-        
         if new_weights==[]:
             new_weights = weights[0,i].reshape(-1,1) * 1.0/3
         else:
@@ -90,9 +104,9 @@ def sigma_point_scale_up( sigma_points, weights, scale_factor=3 ):
             new_points = torch.cat((new_points, sigma_points[:,i].reshape(-1,1).repeat( (1,scale_factor) )), axis=1 )
         
         if new_weights==[]:
-            new_weights = weights[0,i].repeat( (1,scale_factor) )
+            new_weights = weights[0,i].repeat( (1,scale_factor) )/ scale_factor
         else:
-            new_weights = torch.cat( (new_weights, weights[0,i].repeat( (1,scale_factor) )), axis=1 )
+            new_weights = torch.cat( (new_weights, weights[0,i].repeat( (1,scale_factor) )/scale_factor  ), axis=1 )
               
     return new_points, new_weights
     
@@ -128,6 +142,7 @@ def UT_Mean_Evaluator(  fun_handle, robotJ, robotJ_state, robotK_sigma_points, r
         else: 
             mu_A = mu_A + A * robotK_weights[0,i]
             mu_B = mu_B + B * robotK_weights[0,i]
+    print(f" mu_A:{mu_A} , mu_B:{mu_B}")
     return mu_A, mu_B
 
 def UT_Mean_Evaluator_basic(fun_handle, robotJ, robotK_sigma_points, robotK_weights):
