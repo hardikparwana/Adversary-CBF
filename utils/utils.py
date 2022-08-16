@@ -32,7 +32,10 @@ def euler_rate_matrix(phi,theta,psi):
 def getGrad(param):
             if param.grad==None:
                 print("Grad NONE")
-                return 0
+                try: 
+                    return np.zeros(( param.shape[0], param.shape[1] ))
+                except:
+                    return np.zeros(param.shape[0])
             value = param.grad.detach().numpy()
             param.grad = None
             return value  
