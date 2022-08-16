@@ -232,7 +232,7 @@ class MVGP:
         return Kl, Ks
 
     # Get gradient of negative log likelihood (w.r.t. length scale, sigma, omega)
-    def likelihood_gradients(self):
+    def likelihood_gradients(self, print_status = False):
         n = self.X_s.shape[0]
         d = self.Y_s.shape[1]
         
@@ -244,8 +244,9 @@ class MVGP:
         
         iter = 1
         Ns = self.X_s.shape[0]
-        while ( L < -0.001 and iter<10 ):
-            self.resample( int(np.floor( 4.0*Ns/5 )) )
+        while ( L < -0.001 and iter<5 ):
+            Ns = Ns * 4.0 / 5
+            self.resample( int(np.floor( Ns )) )
             K = self.get_covariance()            
                 
             Kinv = np.linalg.inv(K)
@@ -254,17 +255,18 @@ class MVGP:
             A = Kinv @ self.Y_s @ omegainv @ self.Y_s.T #  np.matmul(Kinv, np.matmul(self.Y_s, np.matmul(omegainv, np.transpose(self.Y_s))))
             L = (n*d/2) * np.log(2*np.pi) + (d/2) * np.log(np.linalg.det(K)) + (n/2) * np.log(np.linalg.det(self.omega)) + (1/2)*np.trace(A);
             iter = iter + 1
+            
         # print("iter",iter)
         Kl, Ks = self.get_dK() 
         dL_dl = (d/2)*np.trace( Kinv @ Kl ) + (1/2)*np.trace( -Kinv @ Kl @ A )
         dL_ds = (d/2)*np.trace( Kinv @ Ks ) + (1/2)*np.trace( -Kinv @ Ks @ A )
         dL_domega = (n/2) * omegainv.T - (1.0/2) * omegainv.T @ self.Y_s.T @ Kinv.T @ self.Y_s @ omegainv.T  #  (1/2)*np.matmul(np.matmul(np.matmul(np.matmul(np.transpose(omegainv), np.transpose(self.Y_s)), np.transpose(Kinv)), self.Y_s), np.transpose(omegainv))
             
-        if L<-0.01:
+        if L<-0.01 and print_status:
             print(" *****************  WARN: L<0 *********************")
             L = 0.01
         
-        self.resample(n_samples = Ns)       
+        self.resample(n_samples = n)       
         
         return dL_dl, dL_ds, dL_domega
 
@@ -283,7 +285,7 @@ class MVGP:
         return L
     
 
-    def train(self, n_samples = 100, max_iters = 100):
+    def train(self, n_samples = 100, max_iters = 100, print_status = False):
 
         # Define gradient descent parameters
         vals = []
@@ -305,7 +307,7 @@ class MVGP:
 
             # Get Gradients
             self.resample( n_samples = n_samples )
-            dL_dl, dL_ds, dL_domega = self.likelihood_gradients()
+            dL_dl, dL_ds, dL_domega = self.likelihood_gradients(print_status = print_status)
             dL_domega = (dL_domega + np.transpose(dL_domega))/2
             dL_dl = np.clip(dL_dl, -grad_max, grad_max)
             dL_ds = np.clip(dL_ds, -grad_max, grad_max)
@@ -359,5 +361,5 @@ class MVGP:
                     print("Error in setting variable to update.")
 
             # Save parameters and likelihoods
-            if (iters % 10 == 0):
+            if (iters % 10 == 0) and print_status:
                 print(f"Iteration: {iters}, Likelihood for this dataset: {value}, grads: {dL_dl}, {dL_ds}, {dL_domega}")

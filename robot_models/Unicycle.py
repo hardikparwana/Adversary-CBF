@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from utils.utils import wrap_angle, wrap_angle_tensor
+import matplotlib.patches as mpatches
 
 class Unicycle:
     
@@ -29,6 +30,11 @@ class Unicycle:
         self.U_ref = np.array([0,0]).reshape(-1,1)
         self.U_ref_nominal = np.copy(self.U)
         
+        self.FoV_angle = np.pi/2
+        self.FoV_length = 3.0
+        self.max_D = 3.0
+        self.min_D = 0.2
+        
         # Plot handles
         self.plot = plot
         if self.plot:
@@ -39,12 +45,18 @@ class Unicycle:
                 self.axis = ax.plot([self.X[0,0],self.X[0,0]+self.radii*np.cos(self.X[2,0])],[self.X[1,0],self.X[1,0]+self.radii*np.sin(self.X[2,0])])
             self.render_plot()
             
-            self.body_nominal = ax.scatter([],[],alpha=0.1,s=40,facecolors='none',edgecolors=color) #,c=color
-            self.render_plot(mode='nominal')
+            # self.body_nominal = ax.scatter([],[],alpha=0.1,s=40,facecolors='none',edgecolors=color) #,c=color
+            # self.render_plot(mode='nominal')
+
+            self.lines, = ax.plot([],[],'o-')
+            self.poly = mpatches.Polygon([(0,0.2)], closed=True, color='r',alpha=0.1, linewidth=0) #[] is Nx2
+            self.fov_arc = ax.add_patch(self.poly)
+            self.areas, = ax.fill([],[],'r',alpha=0.1)
+            self.body = ax.scatter([],[],c=color,s=10)            
+            self.des_point = ax.scatter([],[],s=10, facecolors='none', edgecolors='r')
             
-            
-        
-        
+            self.render_plot_fov()
+
         self.alpha = alpha*np.ones((num_robots,1))
         self.alpha_torch = torch.tensor(alpha, dtype=torch.float, requires_grad=True)
         # for Trust computation
@@ -136,6 +148,9 @@ class Unicycle:
                 self.Us = np.append(self.Us,self.U,axis=1)
                 self.Xdots = np.append( self.Xdots, Xdot  , axis=1 )
             
+            self.render_plot()
+            self.render_plot_fov()
+            
             return self.X
         if mode=='nominal':
             self.U_nominal = U.reshape(-1,1)
@@ -162,6 +177,48 @@ class Unicycle:
                 self.body_nominal.set_offsets([x[0],x[1]])
         # self.axis = ax.plot([self.X[0,0],self.X[0,0]+np.cos(self.X[2,0])],[self.X[1,0],self.X[1,0]+np.sin(self.X[2,0])])
         
+    def render_plot_fov(self): #,lines,areas,body, poly, des_point):
+        # length = 3
+        # FoV = np.pi/3   # 60 degrees
+
+        x = np.array([self.X[0,0],self.X[1,0]])
+  
+        theta = self.X[2][0]
+        theta1 = theta + self.FoV_angle/2
+        theta2 = theta - self.FoV_angle/2
+        e1 = np.array([np.cos(theta1),np.sin(theta1)])
+        e2 = np.array([np.cos(theta2),np.sin(theta2)])
+
+        P1 = x + self.FoV_length*e1
+        P2 = x + self.FoV_length*e2  
+
+        des_dist = self.min_D + (self.max_D - self.min_D)/2
+        des_x = np.array( [ self.X[0,0] + np.cos(theta)*des_dist, self.X[1,0] + np.sin(theta)*des_dist    ] )
+
+        triangle_hx = [x[0] , P1[0], P2[0], x[0] ]
+        triangle_hy = [x[1] , P1[1], P2[1], x[1] ]
+        
+        triangle_v = [ x,P1,P2,x ]  
+
+        # lines.set_data(triangle_hx,triangle_hy)
+        self.areas.set_xy(triangle_v)
+
+        # scatter plot update
+        self.body.set_offsets([x[0],x[1]])
+        self.des_point.set_offsets([des_x[0], des_x[1]])
+
+        #Fov arc
+        self.poly.set_xy(self.arc_points(x, self.FoV_length, theta2, theta1))
+
+        # return lines, areas, body, poly, des_point
+        
+    def arc_points(self, center, radius, theta1, theta2, resolution=50):
+        # generate the points
+        theta = np.linspace(theta1, theta2, resolution)
+        points = np.vstack((radius*np.cos(theta) + center[0], 
+                            radius*np.sin(theta) + center[1]))
+        return points.T
+    
     def lyapunov(self, G):
         V = np.linalg.norm( self.X[0:2] - G[0:2] )**2
         dV_dx = np.append( 2*( self.X[0:2] - G[0:2] ).T, [[0]], axis=1)

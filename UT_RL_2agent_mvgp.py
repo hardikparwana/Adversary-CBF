@@ -53,10 +53,15 @@ def compute_A1_b1_tensor(robotsJ, robotsK, alpha, d_min, sys_state):
             x_dot_k_mean = torch.tensor([0,0],dtype=torch.float).reshape(-1,1)
     else:             
         x_dot_k_mean, x_dot_k_cov = robotsK.gp.predict_torch( sys_state.T )
+        # print(f"gp mean: { x_dot_k_mean }, actual_last_xdot: {robotsK.Xdots[:,-1]}")
         
     x_dot_k = x_dot_k_mean.T.reshape(-1,1) #+ cov terms?? 
+    # if robotsK.Xdots == []:
+    #     x_dot_k = torch.zeros(2, type=torch.float).reshape(-1,1)
+    # else: 
+    #     x_dot_k = torch.tensor(robotsK.Xdots[:,-1], dtype=torch.float).reshape(-1,1)
 
-    b1 = -dh_dxj @ robotsJ.f_torch(robotsJ.X_torch) - dh_dxk @ x_dot_k - alpha * h      
+    b1 = dh_dxj @ robotsJ.f_torch(robotsJ.X_torch) + dh_dxk @ x_dot_k + alpha * h      
    
     return A1, b1
 
@@ -67,8 +72,10 @@ def get_follower_input(follower, leader):
     A1, b1 = compute_A1_b1_tensor( follower, leader, follower.alpha_torch, d_min, sys_state )
     
     try:
-        solution = cbf_controller_layer( follower.U_ref_torch, A1, b1  )
-        return solution[0]
+        solution,  = cbf_controller_layer( follower.U_ref_torch, A1, b1  )
+        # solution = follower.U_ref_torch 
+        # print(f"U_ref:{ follower.U_ref_torch.reshape(1,-1) }, cbf: {solution.reshape(1,-1)}")
+        return solution
     except Exception as e:
         print(e)
         exit()        
@@ -84,7 +91,7 @@ def get_future_reward( follower, leader, num_sigma_points ):
     reward = torch.tensor([0],dtype=torch.float)
   
     for i in range(H):       
-        print(f"************** i: {i} ********************")
+        # print(f"************** i: {i} ********************")
         # Get sigma points for neighbor's state and state derivative
         leader_xdot_states, leader_xdot_weights = sigma_point_expand( follower_states[i], leader_states[i], leader_weights[i], leader )
         leader_states_expanded, leader_weights_expanded = sigma_point_scale_up( leader_states[i], leader_weights[i])#leader_xdot_weights )
@@ -98,7 +105,8 @@ def get_future_reward( follower, leader, num_sigma_points ):
         
         # get CBF solution
         solution,  = cbf_controller_layer( u_ref, A, B )
-        print("solution", solution)
+        # solution = u_ref
+        # print("solution", solution)
         # A.sum().backward(retain_graph=True)
         # print("************* hello *******************")
         # Propagate follower and leader state forward
@@ -120,7 +128,7 @@ def get_future_reward( follower, leader, num_sigma_points ):
 
 # Sim Parameters
 num_steps = 100
-H = 30
+H = 10
 outer_loop = 5
 t = 0
 gp_training_iter = 10
@@ -135,9 +143,11 @@ lr_alpha = 0.05
 # Plotting             
 plt.ion()
 fig = plt.figure()
-ax = plt.axes(xlim=(0,7),ylim=(-0.5,8))
+ax = plt.axes(xlim=(0,10),ylim=(-0.5,8))
 ax.set_xlabel("X")
 ax.set_ylabel("Y")
+
+ax.set_aspect(1)
 
 follower = Unicycle(np.array([0,0,np.pi*0.0]), dt_inner, ax, num_robots=num_robots, id = 0, color='g',palpha=1.0, alpha=alpha_cbf )
 leader = SingleIntegrator2D(np.array([1,0]), dt_inner, ax, color='r',palpha=1.0, target = 0)
@@ -148,7 +158,7 @@ sigma = 0.2
 l = 2.0
 leader.gp = gp = MVGP( omega = omega, sigma = sigma, l = l, noise = 0.05, horizon=300 )
 
-max_history = 1000
+max_history = 100
 
 for i in range(num_steps):
 
@@ -176,9 +186,9 @@ for i in range(num_steps):
         train_y = np.copy(leader.Xdots[:,-max_history:].T)
         # shuffle data??  TODO
         leader.gp.set_XY(train_x, train_y)
-        leader.gp.resample( n_samples = 100 )
-        leader.gp.train(max_iters=10)
-        leader.gp.resample_obs( n_samples = 100 )
+        leader.gp.resample( n_samples = 50 )
+        leader.gp.train(max_iters=10, n_samples = 50)
+        leader.gp.resample_obs( n_samples = 50 )
         leader.gp.get_obs_covariance()
         gp.initialize_torch()
         
@@ -187,13 +197,17 @@ for i in range(num_steps):
         reward.backward(retain_graph=True)
         
         alpha_grad = getGrad( follower.alpha_torch )
+        print("alpha_grad",alpha_grad)
         if abs(alpha_grad)>0.1:
             alpha_grad = np.sign(alpha_grad) * 0.3
         # print("alpha grad", alpha_grad)
         follower.alpha = follower.alpha + lr_alpha * alpha_grad.reshape(-1,1)
         # print("follower alpha", follower.alpha)
         
-        exit()
+        # exit()
+        
+    fig.canvas.draw()
+    fig.canvas.flush_events()
 
     
     

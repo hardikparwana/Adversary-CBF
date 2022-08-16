@@ -142,7 +142,6 @@ def UT_Mean_Evaluator(  fun_handle, robotJ, robotJ_state, robotK_sigma_points, r
         else: 
             mu_A = mu_A + A * robotK_weights[0,i]
             mu_B = mu_B + B * robotK_weights[0,i]
-    print(f" mu_A:{mu_A} , mu_B:{mu_B}")
     return mu_A, mu_B
 
 def UT_Mean_Evaluator_basic(fun_handle, robotJ, robotK_sigma_points, robotK_weights):
