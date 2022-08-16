@@ -24,8 +24,8 @@ class MatrixSquareRoot(Function):
         grad_input = None
         # print("inside backprop")
         if ctx.needs_input_grad[0]:
-            print("inside backprop 2")
-            print("SQRTM", ctx.saved_tensors)
+            # print("inside backprop 2")
+            # print("SQRTM", ctx.saved_tensors)
             sqrtm, = ctx.saved_tensors
             sqrtm = sqrtm.data.cpu().numpy().astype(np.float_)
             gm = grad_output.data.cpu().numpy().astype(np.float_)

@@ -76,8 +76,6 @@ class Unicycle:
         self.trust_advs = np.ones((1,num_adversaries))
         self.robot_alphas = alpha*np.ones((1,num_robots))
         self.trust_robots = 1*np.ones((1,num_robots))
-        self.Xs = X0.reshape(-1,1)
-        self.Us = np.array([0,0]).reshape(-1,1)
         self.adv_hs = np.ones((1,num_adversaries))
         self.robot_hs = np.ones((1,num_robots))
         
@@ -85,8 +83,10 @@ class Unicycle:
         self.X_org = np.copy(self.X)
         self.U_org = np.copy(self.U)
         
-        self.Xs = np.copy(self.X)
-        self.Xdots = np.array([0,0,0]).reshape(-1,1)
+        self.Xs = [] # np.copy(self.X)
+        self.Xdots = [] #np.array([0,0,0]).reshape(-1,1)
+        # self.Xs = X0.reshape(-1,1)
+        self.Us = [] #np.array([0,0]).reshape(-1,1)
         gp = []
         
     def f_torch(self,x):
@@ -119,15 +119,27 @@ class Unicycle:
          
     def step(self,U, dt, mode='actual'): 
         if mode=='actual':
+            
+            xold = np.copy(self.X)
+            
             self.U = U.reshape(-1,1)
-            self.X = self.X + ( self.f() + self.g() @ self.U )*dt
+            self.X = self.X + ( self.f() + self.g() @ self.U ) * dt
+            Xdot = self.f() + self.g() @ self.U 
             self.X[2,0] = wrap_angle(self.X[2,0])
-            # self.Xs = np.append(self.Xs,self.X,axis=1)
-            # self.Us = np.append(self.Us,self.U,axis=1)
+            
+            if self.Xs == []:
+                self.Xs = np.copy(xold)
+                self.Us = np.copy(self.U)
+                self.Xdots = np.copy(Xdot)
+            else:            
+                self.Xs = np.append(self.Xs,xold,axis=1)
+                self.Us = np.append(self.Us,self.U,axis=1)
+                self.Xdots = np.append( self.Xdots, Xdot  , axis=1 )
+            
             return self.X
         if mode=='nominal':
             self.U_nominal = U.reshape(-1,1)
-            self.X_nominal = self.X_nominal + ( self.f(mode='nominal') + self.g(mode='nominal') @ self.U_nominal )*dt
+            self.X_nominal = self.X_nominal + ( self.f(mode='nominal') + self.g(mode='nominal') @ self.U_nominal ) * dt
             self.X_nominal[2,0] = wrap_angle(self.X_nominal[2,0])
             # self.Xs = np.append(self.Xs,self.X,axis=1)
             # self.Us = np.append(self.Us,self.U,axis=1)

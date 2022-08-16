@@ -16,49 +16,8 @@ from utils.utils import *
 from utils.ut_utils import *
 from utils.mvgp import *
 
-# Learning algorithm for each step  ##############################################################
-class MultitaskGPModel(gpytorch.models.ExactGP):
-    def __init__(self, train_x, train_y, likelihood):
-        super(MultitaskGPModel, self).__init__(train_x, train_y, likelihood)
-        self.mean_module = gpytorch.means.MultitaskMean(
-            gpytorch.means.ConstantMean(), num_tasks=2
-        )
-        self.covar_module = gpytorch.kernels.MultitaskKernel(
-            gpytorch.kernels.RBFKernel(), num_tasks=2, rank=1
-        )
+torch.autograd.set_detect_anomaly(True)
 
-    def forward(self, x):
-        mean_x = self.mean_module(x)
-        covar_x = self.covar_module(x)
-        return gpytorch.distributions.MultitaskMultivariateNormal(mean_x, covar_x)
-
-# initialize likelihood and model
-likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=2)
-#model = MultitaskGPModel(train_x, train_y, likelihood)
-
-training_iter = 10
-
-def get_GP_model( train_x, train_y, likelihood, training_iter ):
-    
-    model = MultitaskGPModel(train_x, train_y, likelihood)
-    # Use the adam optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)  # Includes GaussianLikelihood parameters
-    model.train()
-    likelihood.train()
-
-    # "Loss" for GPs - the marginal log likelihood
-    mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
-
-    for i in range(training_iter):
-        optimizer.zero_grad()
-        output = model(train_x)
-        loss = -mll(output, train_y)
-        loss.backward()
-        print('Iter %d/%d - Loss: %.3f' % (i + 1, training_iter, loss.item()))
-        optimizer.step()
-    model.eval()
-    likelihood.eval()
-    return model, likelihood
 
 #############################################################
 # CBF Controller: centralized
@@ -86,16 +45,17 @@ def compute_A1_b1_tensor(robotsJ, robotsK, alpha, d_min, sys_state):
     h, dh_dxj, dh_dxk = robotsJ.agent_barrier_torch(robotsJ.X_torch, robotsK.X_torch, d_min, robotsK.type)
     A1 = dh_dxj @ robotsJ.g_torch(robotsJ.X_torch)
     
-    if robotsK.gp_x == []:
+    if robotsK.gp.X == []:
         if robotsK.type=='Unicycle':
-            x_dot_k = torch.tensor([0,0,0],dtype=torch.float).reshape(-1,1)
+            x_dot_k_mean = torch.tensor([0,0,0],dtype=torch.float).reshape(-1,1)
+            x_dot_k_cov = torch.eye(3)
         else:
-            x_dot_k = torch.tensor([0,0],dtype=torch.float).reshape(-1,1)
+            x_dot_k_mean = torch.tensor([0,0],dtype=torch.float).reshape(-1,1)
     else:             
-        if robotsK.type=='Unicycle':
-            x_dot_k = torch.cat( (robotsK.gp_x(sys_state).mean,robotsK.gp_y(sys_state).mean, robotsK.gp_yaw(sys_state).mean ) ).reshape(-1,1)
-        else:
-            x_dot_k = torch.cat( (robotsK.gp_x(sys_state).mean,robotsK.gp_y(sys_state).mean ) ).reshape(-1,1)
+        x_dot_k_mean, x_dot_k_cov = robotsK.gp.predict_torch( sys_state.T )
+        
+    x_dot_k = x_dot_k_mean.T.reshape(-1,1) #+ cov terms?? 
+
     b1 = -dh_dxj @ robotsJ.f_torch(robotsJ.X_torch) - dh_dxk @ x_dot_k - alpha * h      
    
     return A1, b1
@@ -122,12 +82,12 @@ def get_future_reward( follower, leader, num_sigma_points ):
     leader_weights = [prior_leader_weights]
 
     reward = torch.tensor([0],dtype=torch.float)
-    
+  
     for i in range(H):       
-        
+        print(f"************** i: {i} ********************")
         # Get sigma points for neighbor's state and state derivative
         leader_xdot_states, leader_xdot_weights = sigma_point_expand( follower_states[i], leader_states[i], leader_weights[i], leader )
-        leader_states_expanded, leader_weights_expanded = sigma_point_scale_up( leader_states[i], leader_xdot_weights )
+        leader_states_expanded, leader_weights_expanded = sigma_point_scale_up( leader_states[i], leader_weights[i])#leader_xdot_weights )
         
         # CBF derivative condition
         A, B = UT_Mean_Evaluator( cbf_condition_evaluator, follower, follower_states[i], leader_states_expanded, leader_xdot_states, leader_weights_expanded )
@@ -138,7 +98,9 @@ def get_future_reward( follower, leader, num_sigma_points ):
         
         # get CBF solution
         solution,  = cbf_controller_layer( u_ref, A, B )
-        A.sum().backward(retain_graph=True)
+        print("solution", solution)
+        # A.sum().backward(retain_graph=True)
+        # print("************* hello *******************")
         # Propagate follower and leader state forward
         follower_states.append( follower.step_torch( follower_states[i], solution, dt_outer ) )
         
@@ -149,15 +111,16 @@ def get_future_reward( follower, leader, num_sigma_points ):
         # Get reward for this state and control input choice = Expected reward in general settings
         reward_function = lambda a, b: follower.compute_reward(a, b, des_d = 0.7)
         reward = reward + UT_Mean_Evaluator_basic( reward_function, follower_states[i+1], leader_states[i+1], leader_weights[i+1])
+        # print(f"Reward Checking for Nans: {torch.isnan(reward)}")
         
-    print("forward prop done!")
+    # print("forward prop done!")
     return reward
         
 ################################################################
 
 # Sim Parameters
 num_steps = 100
-H = 3
+H = 30
 outer_loop = 5
 t = 0
 gp_training_iter = 10
@@ -179,6 +142,14 @@ ax.set_ylabel("Y")
 follower = Unicycle(np.array([0,0,np.pi*0.0]), dt_inner, ax, num_robots=num_robots, id = 0, color='g',palpha=1.0, alpha=alpha_cbf )
 leader = SingleIntegrator2D(np.array([1,0]), dt_inner, ax, color='r',palpha=1.0, target = 0)
 
+# Initialize GP
+omega = np.array([ [1.0, 0.0],[0.0, 1.0] ])
+sigma = 0.2
+l = 2.0
+leader.gp = gp = MVGP( omega = omega, sigma = sigma, l = l, noise = 0.05, horizon=300 )
+
+max_history = 1000
+
 for i in range(num_steps):
 
     # High frequency
@@ -199,14 +170,18 @@ for i in range(num_steps):
     # Low Frequency tuning
     else: 
         initialize_tensors(follower, leader)
-        train_x = torch.tensor( np.append( np.copy(follower.Xs.T), np.copy(leader.Xs.T) , axis = 1  ), dtype=torch.float )
-        train_y = torch.tensor( np.copy(leader.Xdots.T) , dtype=torch.float )
-        # shuffle data??  TODO
-        model, likelihood = get_GP_model( train_x, train_y, likelihood, gp_training_iter )
-        leader.gp = model
-        leader.likelihood = likelihood
         
-        objective_tensor = torch.tensor(0,requires_grad=True, dtype=torch.float)
+        # Train GP
+        train_x = np.append( np.copy(follower.Xs[:,-max_history:].T), np.copy(leader.Xs[:,-max_history:].T) , axis = 1  )
+        train_y = np.copy(leader.Xdots[:,-max_history:].T)
+        # shuffle data??  TODO
+        leader.gp.set_XY(train_x, train_y)
+        leader.gp.resample( n_samples = 100 )
+        leader.gp.train(max_iters=10)
+        leader.gp.resample_obs( n_samples = 100 )
+        leader.gp.get_obs_covariance()
+        gp.initialize_torch()
+        
         reward = get_future_reward( follower, leader, num_sigma_points = 1 )
 
         reward.backward(retain_graph=True)
@@ -217,5 +192,68 @@ for i in range(num_steps):
         # print("alpha grad", alpha_grad)
         follower.alpha = follower.alpha + lr_alpha * alpha_grad.reshape(-1,1)
         # print("follower alpha", follower.alpha)
+        
+        exit()
 
     
+    
+# Explicit
+  
+# Step 1
+
+# i = 0
+# print(f"************** i: 1 ********************")
+# leader_xdot_states1, leader_xdot_weights1 = sigma_point_expand( follower_states[i], leader_states[i], leader_weights[i], leader )
+# leader_states_expanded1, leader_weights_expanded1 = sigma_point_scale_up( leader_states[i], leader_xdot_weights1 )
+
+# # CBF derivative condition
+# A1, B1 = UT_Mean_Evaluator( cbf_condition_evaluator, follower, follower_states[i], leader_states_expanded1, leader_xdot_states1, leader_weights_expanded1 )
+        
+# # get nominal controller
+# leader_mean_position1 = get_mean_cov( leader_states[i], leader_weights[i], compute_cov=False )
+# u_ref1 = follower.nominal_input_tensor( follower_states[i], leader_mean_position1 )
+
+# # get CBF solution
+# solution1,  = cbf_controller_layer( u_ref1, A1, B1 )
+# # A1.sum().backward(retain_graph=True)
+# print("************* hello *******************")
+# # Propagate follower and leader state forward
+# follower_states.append( follower.step_torch( follower_states[i], solution1, dt_outer ) )
+
+# leader_next_state_expanded1 = leader_states_expanded1 + leader_xdot_states1 * dt_outer
+# leader_next_states1, leader_next_weights1 = sigma_point_compress( leader_next_state_expanded1, leader_xdot_weights1 )
+# leader_states.append( leader_next_states1 ); leader_weights.append( leader_next_weights1 )
+
+# # Get reward for this state and control input choice = Expected reward in general settings
+# reward_function = lambda a, b: follower.compute_reward(a, b, des_d = 0.7)
+# reward = reward + UT_Mean_Evaluator_basic( reward_function, follower_states[i+1], leader_states[i+1], leader_weights[i+1])
+
+
+# # Step 2
+# i = 1
+# print(f"************** i: 2 ********************")
+# leader_xdot_states2, leader_xdot_weights2 = sigma_point_expand( follower_states[i], leader_states[i], leader_weights[i], leader )
+# leader_states_expanded2, leader_weights_expanded2 = sigma_point_scale_up( leader_states[i], leader_xdot_weights2 )
+
+# # CBF derivative condition
+# A2, B2 = UT_Mean_Evaluator( cbf_condition_evaluator, follower, follower_states[i], leader_states_expanded2, leader_xdot_states2, leader_weights_expanded2 )
+        
+# # get nominal controller
+# leader_mean_position2 = get_mean_cov( leader_states[i], leader_weights[i], compute_cov=False )
+# u_ref2 = follower.nominal_input_tensor( follower_states[i], leader_mean_position2 )
+
+# # get CBF solution
+# solution2,  = cbf_controller_layer( u_ref2, A2, B2 )
+# # A2.sum().backward(retain_graph=True)
+# print("************* hello *******************")
+# # Propagate follower and leader state forward
+# follower_states.append( follower.step_torch( follower_states[i], solution2, dt_outer ) )
+
+# leader_next_state_expanded2 = leader_states_expanded2 + leader_xdot_states2 * dt_outer
+# leader_next_states2, leader_next_weights2 = sigma_point_compress( leader_next_state_expanded2, leader_xdot_weights2 )
+# leader_states.append( leader_next_states2 ); leader_weights.append( leader_next_weights2 )
+
+# # Get reward for this state and control input choice = Expected reward in general settings
+# reward_function = lambda a, b: follower.compute_reward(a, b, des_d = 0.7)
+# reward = reward + UT_Mean_Evaluator_basic( reward_function, follower_states[i+1], leader_states[i+1], leader_weights[i+1])
+
