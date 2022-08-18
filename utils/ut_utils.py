@@ -54,9 +54,9 @@ def sigma_point_expand(robot_state, sigma_points, weights, leader):
     new_weights = []#np.array([0])
     for i in range(N):
         #get GP gaussian
-        # sys_state = torch.autograd.Variable(torch.cat( (robot_state.T, sigma_points[:,i].reshape(-1,1).T), 1 ), requires_grad=True)
-        # sys_state = identity( torch.cat( (robot_state.T, sigma_points[:,i].reshape(-1,1).T), 1 ) )
-        sys_state = torch.cat( (robot_state.T, sigma_points[:,i].reshape(-1,1).T), 1 )
+
+        # sys_state = torch.cat( (robot_state.T, sigma_points[:,i].reshape(-1,1).T), 1 )
+        sys_state = sigma_points[:,i].reshape(-1,1).T
         # sys_state.retain_grad()
         mu, cov = leader.gp.predict_torch( sys_state ) # all are tensors here
         mu = mu.reshape(-1,1)
@@ -129,6 +129,42 @@ def cbf_condition_evaluator( robotJ, robotJ_state, robotK_state, robotK_state_do
     B = dh_dxj @ robotJ.f_torch( robotJ_state ) + dh_dxk @ robotK_state_dot + robotJ.alpha_torch @ h
     A = dh_dxj @ robotJ.g_torch( robotJ_state ) 
     return A, B
+
+def cbf_fov_condition_evaluator( robotJ, robotJ_state, robotK_state, robotK_state_dot, robotK_type='SingleIntegrator2D'):
+    h1, dh1_dxj, dh1_dxk, h2, dh2_dxj, dh2_dxk, h3, dh3_dxj, dh3_dxk = robotJ.agent_fov_barrier(robotJ_state, robotK_state, robotK_type)    
+    
+    B1 = dh1_dxj @ robotJ.f_torch( robotJ_state ) + dh1_dxk @ robotK_state_dot + robotJ.alpha_torch[0] * h1
+    A1 = dh1_dxj @ robotJ.g_torch( robotJ_state ) 
+    
+    B2 = dh2_dxj @ robotJ.f_torch( robotJ_state ) + dh2_dxk @ robotK_state_dot + robotJ.alpha_torch[1] * h2
+    A2 = dh2_dxj @ robotJ.g_torch( robotJ_state ) 
+    
+    B3 = dh3_dxj @ robotJ.f_torch( robotJ_state ) + dh3_dxk @ robotK_state_dot + robotJ.alpha_torch[2] * h3
+    A3 = dh3_dxj @ robotJ.g_torch( robotJ_state ) 
+    
+    B = torch.cat( (B1, B2, B3), dim = 0 )
+    A = torch.cat( (A1, A2, A3), dim = 0 )
+    
+    return A, B
+
+def clf_condition_evaluator( robotJ, robotJ_state, robotK_state, robotK_state_dot, robotK_type='SingleIntegrator2D' ):
+    V, dV_dxj, dV_dxk = robotJ.lyapunov_tensor( robotJ_state, robotK_state )
+    
+    B = - dV_dxj @ robotJ.f_torch( robotJ_state ) - dV_dxk @ robotK_state_dot - robotJ.k_torch * V
+    A = - dV_dxj @ robotJ.g_torch( robotJ_state )
+    
+    return A, B 
+
+def clf_cbf_fov_evaluator( robotJ, robotJ_state, robotK_state, robotK_state_dot, robotK_type='SingleIntegrator2D' ):
+    
+    A1, B1 = clf_condition_evaluator( robotJ, robotJ_state, robotK_state, robotK_state_dot, robotK_type )
+    A2, B2 = cbf_fov_condition_evaluator( robotJ, robotJ_state, robotK_state, robotK_state_dot, robotK_type )
+    
+    B = torch.cat( (B1, B2), dim=0 )
+    A = torch.cat( (A1, A2), dim=0 )
+    
+    return A, B
+    
 
 def UT_Mean_Evaluator(  fun_handle, robotJ, robotJ_state, robotK_sigma_points, robotK_dot_sigma_points, robotK_weights ):
     

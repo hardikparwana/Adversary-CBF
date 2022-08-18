@@ -176,6 +176,9 @@ class MVGP:
         # print("**************** called *****************")
         Sigma = self.evaluate_kernel_torch(Xnew, Xnew) + self.noise - (self.K_inv_torch @ k_star).T @ torch.clone(k_star)
         cov = torch.kron(Sigma, self.omega_torch)
+        
+        mean = torch.tensor([[1,1]], dtype=torch.float)
+        cov = torch.zeros((2,2), dtype=torch.float)
         return mean, cov
     
     # For TRAINING
@@ -244,7 +247,7 @@ class MVGP:
         
         iter = 1
         Ns = self.X_s.shape[0]
-        while ( L < -0.001 and iter<5 ):
+        while ( L < -0.001 and iter<3 ):
             Ns = Ns * 4.0 / 5
             self.resample( int(np.floor( Ns )) )
             K = self.get_covariance()            

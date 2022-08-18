@@ -112,7 +112,7 @@ class SingleIntegrator2D:
         else:            
             self.Xs = np.append(self.Xs,xold,axis=1)
             self.Us = np.append(self.Us,self.U,axis=1)
-            self.Xdots = np.append( self.Xdots, Xdot  , axis=1 )
+            self.Xdots = np.append( self.Xdots, Xdot , axis=1 )
         
         return self.X
 

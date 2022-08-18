@@ -5,7 +5,7 @@ import matplotlib.patches as mpatches
 
 class Unicycle:
     
-    def __init__(self,X0,dt,ax,id,num_robots=1, d_min = 0.3, num_adversaries = 1, alpha=0.8,color='r',palpha=1.0,plot=True, identity='nominal'):
+    def __init__(self,X0,dt,ax,id,num_robots=1, min_D = 0.3, max_D = 2.0, FoV_angle = np.pi/2, num_adversaries = 1, alpha=0.8, k = 10.0, color='r',palpha=1.0,plot=True, identity='nominal', num_alpha = 1):
         '''
         X0: iniytial state
         dt: simulation time step
@@ -21,8 +21,6 @@ class Unicycle:
         self.dt = dt
         self.id = id
         
-        self.d_min = d_min
-        
         self.X_torch = []
         
         self.U = np.array([0,0]).reshape(-1,1)
@@ -30,10 +28,10 @@ class Unicycle:
         self.U_ref = np.array([0,0]).reshape(-1,1)
         self.U_ref_nominal = np.copy(self.U)
         
-        self.FoV_angle = np.pi/2
-        self.FoV_length = 3.0
-        self.max_D = 3.0
-        self.min_D = 0.2
+        self.FoV_angle = FoV_angle #np.pi/2
+        self.FoV_length = max_D  #3.0
+        self.max_D = max_D #3.0
+        self.min_D = min_D #0.2
         
         # Plot handles
         self.plot = plot
@@ -57,8 +55,13 @@ class Unicycle:
             
             self.render_plot_fov()
 
-        self.alpha = alpha*np.ones((num_robots,1))
+        # self.alpha = alpha*np.ones((num_robots,1))
+        self.alpha = alpha*np.ones((num_alpha,1))
         self.alpha_torch = torch.tensor(alpha, dtype=torch.float, requires_grad=True)
+        
+        self.k = k
+        self.k_torch = torch.tensor( k, dtype=torch.float, requires_grad=True )
+        
         # for Trust computation
         self.adv_alpha =  alpha*np.ones((1,num_adversaries))# alpha*np.ones((1,num_adversaries))
         self.trust_adv = np.ones((1,num_adversaries))
@@ -146,7 +149,7 @@ class Unicycle:
             else:            
                 self.Xs = np.append(self.Xs,xold,axis=1)
                 self.Us = np.append(self.Us,self.U,axis=1)
-                self.Xdots = np.append( self.Xdots, Xdot  , axis=1 )
+                self.Xdots = np.append( self.Xdots, Xdot , axis=1 )
             
             self.render_plot()
             self.render_plot_fov()
@@ -219,15 +222,21 @@ class Unicycle:
                             radius*np.sin(theta) + center[1]))
         return points.T
     
-    def lyapunov(self, G):
-        V = np.linalg.norm( self.X[0:2] - G[0:2] )**2
-        dV_dx = np.append( 2*( self.X[0:2] - G[0:2] ).T, [[0]], axis=1)
-        return V, dV_dx
+    def lyapunov(self, X, G):
+        avg_D = (self.min_D + self.max_D)/2.0
+        V = ( np.linalg.norm( self.X[0:2] - G[0:2] ) - avg_D  )**2
+        # dV_dx = np.append( 2*( self.X[0:2] - G[0:2] ).T, [[0]], axis=1)
+        return V #, dV_dx
     
     def lyapunov_tensor(self, X, G):
-        V = torch.square ( torch.norm( X[0:2] - G[0:2] ) )
-        dV_dx = torch.cat ( (2*( X[0:2] - G[0:2] ).T, [[0]] ), 1) 
-        return V, dV_dx
+        avg_D = (self.min_D + self.max_D)/2.0
+        V = torch.square ( torch.norm( X[0:2] - G[0:2] ) - avg_D )
+        
+        factor = 2*(torch.norm( X[0:2]- G[0:2] ) - avg_D)/torch.norm( X[0:2] - G[0:2] ) * (  X[0:2] - G[0:2] ).reshape(1,-1) 
+        dV_dxi = torch.cat( (factor, torch.tensor([[0]])), dim  = 1 )
+        dV_dxj = -factor
+        
+        return V, dV_dxi, dV_dxj
     
     def nominal_input(self,G):
         # V, dV_dx = self.lyapunov(G)
@@ -291,9 +300,9 @@ class Unicycle:
         k1 = 2
         return -torch.div ( torch.exp(k1-s),( 1+torch.exp( k1-s ) ) ) @ ( 1 + self.sigma_torch(s) )
     
-    def agent_barrier(self,agent,d_min):
+    def agent_barrier(self,agent):
         beta = 1.01
-        h = beta*d_min**2 - np.linalg.norm(self.X[0:2] - agent.X[0:2])**2
+        h = beta*self.min_D**2 - np.linalg.norm(self.X[0:2] - agent.X[0:2])**2
         h1 = h
         
         theta = self.X[2,0]
@@ -314,9 +323,9 @@ class Unicycle:
         
         return h, dh_dxi, dh_dxj
     
-    def agent_barrier_torch(self, X, targetX, d_min, target_type='Unicycle'):
+    def agent_barrier_torch(self, X, targetX, target_type='Unicycle'):
         beta = 1.01
-        h = beta*d_min**2 -  torch.square( torch.norm(X[0:2] - targetX[0:2])  )
+        h = beta*self.min_D**2 -  torch.square( torch.norm(X[0:2] - targetX[0:2])  )
         h1 = h
         
         theta = X[2,0]
@@ -334,8 +343,38 @@ class Unicycle:
         else:
             dh_dxj = 2*( X[0:2] - targetX[0:2] ).T
         
-        return h_final, dh_dxi, dh_dxj
+        return -h_final, -dh_dxi, -dh_dxj
+    
+    def agent_fov_barrier(self, X, targetX, target_type='SingleIntegrator2D'):
+        
+        # Max distance
+        h1 = self.max_D**2 - torch.square( torch.norm( X[0:2] - targetX[0:2] ) )
+        dh1_dxi = torch.cat( ( -2*( X[0:2] - targetX[0:2] ), torch.tensor([[0.0]]) ), 0).T
+        dh1_dxj =  2*( X[0:2] - targetX[0:2] ).T
+        
+        # Min distance
+        h2 = torch.square(torch.norm( X[0:2] - targetX[0:2] )) - self.min_D**2
+        dh2_dxi = torch.cat( ( 2*( X[0:2] - targetX[0:2] ), torch.tensor([[0.0]]) ), 0).T
+        dh2_dxj = - 2*( X[0:2] - targetX[0:2]).T
+    
+        # Max angle
+        p = targetX[0:2] - X[0:2]
+
+        # dir_vector = torch.tensor([[torch.cos(x[2,0])],[torch.sin(x[2,0])]]) # column vector
+        dir_vector = torch.cat( ( torch.cos(X[2,0]).reshape(-1,1), torch.sin(X[2,0]).reshape(-1,1) ) )
+        bearing_angle  = torch.matmul(dir_vector.T , p )/ torch.norm(p)
+        h3 = (bearing_angle - np.cos(self.FoV_angle/2))/(1.0-np.cos(self.FoV_angle/2))
+
+        norm_p = torch.norm(p)
+        dh3_dx = dir_vector.T / norm_p - ( dir_vector.T @ p)  * p.T / torch.pow(norm_p,3)    
+        dh3_dTheta = ( -torch.sin(X[2]) * p[0] + torch.cos(X[2]) * p[1] ).reshape(1,-1)  /torch.norm(p)
+        dh3_dxi = torch.cat(  ( -dh3_dx , dh3_dTheta), 1  )
+        dh3_dxj = dh3_dx
+        
+        return h1, dh1_dxi, dh1_dxj, h2, dh2_dxi, dh2_dxj, h3, dh3_dxi, dh3_dxj
     
     def compute_reward(self,X,targetX, des_d = 0.7):
-        return torch.square( torch.norm( X[0:2,0] - targetX[0:2,0]  ) - torch.tensor(des_d) )
+        # return torch.square( torch.norm( X[0:2,0] - targetX[0:2,0]  ) - torch.tensor(des_d) )
+    
+        return torch.square( torch.norm( X[0:2,0] - targetX[0:2,0]  ) - torch.tensor((self.min_D+self.max_D)/2) )
     
