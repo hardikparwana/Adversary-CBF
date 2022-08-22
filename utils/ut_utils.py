@@ -46,8 +46,15 @@ def generate_sigma_points( mu, cov, num_sigma_points = 1 ):
             
     return new_points, new_weights
     
+# def leader_predict(t):
+#     uL = 0.5
+#     vL = 3*np.sin(np.pi*t*4) #  0.1 # 1.2
+#     # uL = 1
+#     # vL = 1
+#     return uL, vL
+    # return leader_motion(t)
 
-def sigma_point_expand(robot_state, sigma_points, weights, leader):
+def sigma_point_expand(robot_state, sigma_points, weights, leader, cur_t = 0):
     # find number of sigma points
     n, N = sigma_points.shape
     new_points = []#torch.zeros((n,1))
@@ -59,6 +66,10 @@ def sigma_point_expand(robot_state, sigma_points, weights, leader):
         sys_state = sigma_points[:,i].reshape(-1,1).T
         # sys_state.retain_grad()
         mu, cov = leader.gp.predict_torch( sys_state ) # all are tensors here
+        mu, cov = leader.predict_function(cur_t)  
+        
+        # print(f"mu:{mu}, cov:{cov}")
+        
         mu = mu.reshape(-1,1)
         # mu = torch.tensor([[0.5],[0.5]]) * torch.norm( sys_state )
         # cov = torch.tensor([[0.0181, 0.0064],
@@ -159,6 +170,26 @@ def clf_cbf_fov_evaluator( robotJ, robotJ_state, robotK_state, robotK_state_dot,
     
     A1, B1 = clf_condition_evaluator( robotJ, robotJ_state, robotK_state, robotK_state_dot, robotK_type )
     A2, B2 = cbf_fov_condition_evaluator( robotJ, robotJ_state, robotK_state, robotK_state_dot, robotK_type )
+    
+    # V, dV_dxj, dV_dxk = robotJ.lyapunov_tensor( robotJ_state, robotK_state )
+    
+    # B1 = - dV_dxj @ robotJ.f_torch( robotJ_state ) - dV_dxk @ robotK_state_dot - robotJ.k_torch * V
+    # A1 = - dV_dxj @ robotJ.g_torch( robotJ_state )
+    
+    # h1, dh1_dxj, dh1_dxk, h2, dh2_dxj, dh2_dxk, h3, dh3_dxj, dh3_dxk = robotJ.agent_fov_barrier(robotJ_state, robotK_state, robotK_type)    
+    
+    # B21 = dh1_dxj @ robotJ.f_torch( robotJ_state ) + dh1_dxk @ robotK_state_dot + robotJ.alpha_torch[0] * h1
+    # A21 = dh1_dxj @ robotJ.g_torch( robotJ_state ) 
+    
+    # B22 = dh2_dxj @ robotJ.f_torch( robotJ_state ) + dh2_dxk @ robotK_state_dot + robotJ.alpha_torch[1] * h2
+    # A22 = dh2_dxj @ robotJ.g_torch( robotJ_state ) 
+    
+    # B23 = dh3_dxj @ robotJ.f_torch( robotJ_state ) + dh3_dxk @ robotK_state_dot + robotJ.alpha_torch[2] * h3
+    # A23 = dh3_dxj @ robotJ.g_torch( robotJ_state ) 
+    
+    # B2 = torch.cat( (B21, B22, B23), dim = 0 )
+    # A2 = torch.cat( (A21, A22, A23), dim = 0 )
+    
     
     B = torch.cat( (B1, B2), dim=0 )
     A = torch.cat( (A1, A2), dim=0 )

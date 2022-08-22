@@ -23,7 +23,10 @@ l = 2.0
 
 train_y = np.append( train_y1, train_y2, axis=0 )
 
-gp = MVGP( X = train_x.T, Y = train_y.T, omega = omega, sigma = sigma, l = l, noise = 0.05, horizon=300 )
+L = 5.0
+p = 1.0
+
+gp = MVGP( X = train_x.T, Y = train_y.T, omega = omega, sigma = sigma, L = L, p = p, l = l, noise = 0.05, horizon=300, kernel_type = 'Gaussian' )
 gp.X_obs = gp.X
 gp.Y_obs = gp.Y
 gp.N_data = gp.X_obs.shape[0]
@@ -52,12 +55,12 @@ axis1[0].plot( train_x[0], train_y1[0], 'k--', label='True Value' )
 axis1[0].plot( train_x[0], ys[:,0], 'r', label='Untrained Predicted Mean' )
 axis1[0].fill_between( train_x[0], ys[:,0] - factor * covs[:,0], ys[:,0] + factor * covs[:,0], color="tab:orange", alpha=0.2 )
 
-axis1[1].plot( train_x[0], train_y2[0], label='True Value' )
-axis1[1].plot( train_x[0], ys[:,1], label='Untrained Predicted Mean' )
+axis1[1].plot( train_x[0], train_y2[0], 'k--', label='True Value' )
+axis1[1].plot( train_x[0], ys[:,1], 'r', label='Untrained Predicted Mean' )
 axis1[1].fill_between( train_x[0], ys[:,1] - factor * covs[:,1], ys[:,1] + factor * covs[:,1], color="tab:orange", alpha=0.2 )
 
-gp.train(max_iters=10)
-print(f"New Parameters: omage: {gp.omega}, Sigma: {gp.sigma}, l:{gp.l}")
+gp.train(max_iters=100, print_status = True)
+print(f"New Parameters: omega: {gp.omega}, Sigma: {gp.sigma}, l:{gp.l}, L:{gp.L}, p:{gp.p}")
 gp.get_obs_covariance()
 
 # gp.omega = np.array( [ [0.9168, -0.0205],[-0.0205, 0.9809] ] )
@@ -103,8 +106,10 @@ for i in range(train_x_tensor.shape[1]):
 ## Plot
 axis1[0].plot( train_x[0], ys[:,0], 'g', label='Trained Predicted Mean' )
 axis1[0].fill_between( train_x[0], ys[:,0] - factor * covs[:,0], ys[:,0] + factor * covs[:,0], color="tab:blue", alpha=0.2 )
+axis1[0].legend()
 
 axis1[1].plot( train_x[0], ys[:,1], 'g', label='Trained Predicted Mean' )
 axis1[1].fill_between( train_x[0], ys[:,1] - factor * covs[:,1], ys[:,1] + factor * covs[:,1], color="tab:blue", alpha=0.2 )
+axis1[1].legend()
 
 plt.show()

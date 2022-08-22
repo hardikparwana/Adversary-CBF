@@ -5,7 +5,7 @@ import matplotlib.patches as mpatches
 
 class Unicycle:
     
-    def __init__(self,X0,dt,ax,id,num_robots=1, min_D = 0.3, max_D = 2.0, FoV_angle = np.pi/2, num_adversaries = 1, alpha=0.8, k = 10.0, color='r',palpha=1.0,plot=True, identity='nominal', num_alpha = 1):
+    def __init__(self,X0,dt,ax,id,num_robots=1, min_D = 0.3, max_D = 2.0, FoV_angle = np.pi/2, num_adversaries = 1, alpha=0.8, k = 10.0, color='r',palpha=1.0,plot=True, identity='nominal', num_alpha = 1, predict_function = None):
         '''
         X0: iniytial state
         dt: simulation time step
@@ -32,6 +32,7 @@ class Unicycle:
         self.FoV_length = max_D  #3.0
         self.max_D = max_D #3.0
         self.min_D = min_D #0.2
+        self.predict_function = predict_function
         
         # Plot handles
         self.plot = plot
@@ -87,6 +88,8 @@ class Unicycle:
         self.b2 = np.zeros((num_constraints1,1))
         
         # For plotting
+        self.alphas = np.copy(self.alpha)
+        self.ks = np.copy(self.k)
         self.adv_alphas = alpha*np.ones((1,num_adversaries))
         self.trust_advs = np.ones((1,num_adversaries))
         self.robot_alphas = alpha*np.ones((1,num_robots))

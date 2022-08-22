@@ -3,7 +3,7 @@ import torch
 
 class SingleIntegrator2D:
     
-    def __init__(self,X0,dt,ax,id=0,num_robots=1,num_adversaries = 1, alpha=0.8,color='r',palpha=1.0,plot=True, identity = 'adversary', target='move right'):
+    def __init__(self,X0,dt,ax,id=0,num_robots=1,num_adversaries = 1, alpha=0.8,color='r',palpha=1.0,plot=True, identity = 'adversary', target='move right', predict_function = None):
         '''
         X0: iniytial state
         dt: simulation time step
@@ -20,6 +20,7 @@ class SingleIntegrator2D:
         self.gp_y = []
         self.gp = []
         self.likelihood = []
+        self.predict_function = predict_function
         ###########
         
         X0 = X0.reshape(-1,1)
