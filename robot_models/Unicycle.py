@@ -371,13 +371,17 @@ class Unicycle:
         norm_p = torch.norm(p)
         dh3_dx = dir_vector.T / norm_p - ( dir_vector.T @ p)  * p.T / torch.pow(norm_p,3)    
         dh3_dTheta = ( -torch.sin(X[2]) * p[0] + torch.cos(X[2]) * p[1] ).reshape(1,-1)  /torch.norm(p)
-        dh3_dxi = torch.cat(  ( -dh3_dx , dh3_dTheta), 1  )
-        dh3_dxj = dh3_dx
+        dh3_dxi = torch.cat(  ( -dh3_dx , dh3_dTheta), 1  ) /(1.0-np.cos(self.FoV_angle/2))
+        dh3_dxj = dh3_dx /(1.0-np.cos(self.FoV_angle/2))
         
         return h1, dh1_dxi, dh1_dxj, h2, dh2_dxi, dh2_dxj, h3, dh3_dxi, dh3_dxj
     
     def compute_reward(self,X,targetX, des_d = 0.7):
         # return torch.square( torch.norm( X[0:2,0] - targetX[0:2,0]  ) - torch.tensor(des_d) )
-    
-        return torch.square( torch.norm( X[0:2,0] - targetX[0:2,0]  ) - torch.tensor((self.min_D+self.max_D)/2) )
+        p = targetX[0:2] - X[0:2]
+        dir_vector = torch.cat( ( torch.cos(X[2,0]).reshape(-1,1), torch.sin(X[2,0]).reshape(-1,1) ) )
+        bearing_angle  = torch.matmul(dir_vector.T , p )/ torch.norm(p)
+        h3 = (bearing_angle - np.cos(self.FoV_angle/2))/(1.0-np.cos(self.FoV_angle/2))
+        
+        return torch.square( torch.norm( X[0:2,0] - targetX[0:2,0]  ) - torch.tensor((self.min_D+self.max_D)/2) ) - 2 * h3
     

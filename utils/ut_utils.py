@@ -2,6 +2,9 @@ import numpy as np
 import torch
 from utils.sqrtm import sqrtm
 from utils.identity_map import identity
+from inliner import inline
+from numba import njit
+from numba import jit
 
 def get_mean_cov(sigma_points, weights, compute_cov=True):
     
@@ -97,6 +100,7 @@ def sigma_point_expand(robot_state, sigma_points, weights, leader, cur_t = 0):
             new_weights = torch.cat( (new_weights, weights[0,i].reshape(-1,1) * 1.0/3) , 1 )
         new_weights = torch.cat( (new_weights, weights[0,i].reshape(-1,1) * 1.0/3) , 1 )
         new_weights = torch.cat( (new_weights, weights[0,i].reshape(-1,1) * 1.0/3), 1 )       
+        # print("new_points",new_points)
     return new_points, new_weights
 
 def sigma_point_compress( sigma_points, weights ):
@@ -158,6 +162,7 @@ def cbf_fov_condition_evaluator( robotJ, robotJ_state, robotK_state, robotK_stat
     
     return A, B
 
+# @jit
 def clf_condition_evaluator( robotJ, robotJ_state, robotK_state, robotK_state_dot, robotK_type='SingleIntegrator2D' ):
     V, dV_dxj, dV_dxk = robotJ.lyapunov_tensor( robotJ_state, robotK_state )
     
@@ -165,6 +170,7 @@ def clf_condition_evaluator( robotJ, robotJ_state, robotK_state, robotK_state_do
     A = - dV_dxj @ robotJ.g_torch( robotJ_state )
     
     return A, B 
+
 
 def clf_cbf_fov_evaluator( robotJ, robotJ_state, robotK_state, robotK_state_dot, robotK_type='SingleIntegrator2D' ):
     
@@ -211,6 +217,7 @@ def UT_Mean_Evaluator(  fun_handle, robotJ, robotJ_state, robotK_sigma_points, r
             mu_B = mu_B + B * robotK_weights[0,i]
     return mu_A, mu_B
 
+# @inline 
 def UT_Mean_Evaluator_basic(fun_handle, robotJ, robotK_sigma_points, robotK_weights):
     mu = []
     for i in range(robotK_sigma_points.shape[1]):
