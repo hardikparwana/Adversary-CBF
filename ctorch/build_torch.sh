@@ -1,3 +1,3 @@
 #!/bin/bash
-cmake -DCMAKE_PREFIX_PATH=/home/hardik/Desktop/Research/Adversary-CBF/ctorch/libtorch ..
+cmake -DCMAKE_PREFIX_PATH=/home/hardik/softwares/libtorch ..
 cmake --build . --config Release
