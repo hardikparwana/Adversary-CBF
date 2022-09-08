@@ -1,2 +1,4 @@
 # ignore python generated files
 .pyc
+images/
+videos/
