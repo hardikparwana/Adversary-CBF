@@ -139,6 +139,7 @@ def dh_dxijk( robotJ, robotJ_state, robotK_state, robotK_type='SingleIntegrator2
     h, dh_dxj, dh_dxk = robotJ.agent_barrier_torch(robotJ_state, robotK_state, d_min, robotK_type)
     return h, dh_dxj, dh_dxk
 
+# @torch.jit.script
 def cbf_condition_evaluator( robotJ, robotJ_state, robotK_state, robotK_state_dot, robotK_type='SingleIntegrator2D'):
     h, dh_dxj, dh_dxk = robotJ.agent_barrier_torch(robotJ_state, robotK_state, robotJ.d_min, robotK_type)    
     B = dh_dxj @ robotJ.f_torch( robotJ_state ) + dh_dxk @ robotK_state_dot + robotJ.alpha_torch @ h

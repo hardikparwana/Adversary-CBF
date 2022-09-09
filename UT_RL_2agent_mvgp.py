@@ -105,6 +105,7 @@ def get_follower_input(follower, leader):
         print(e)
         exit()        
     
+# @torch.jit.script
 def get_future_reward( follower, leader, num_sigma_points, t = 0 ):
     
     # Initialize sigma points for other robots
@@ -118,63 +119,52 @@ def get_future_reward( follower, leader, num_sigma_points, t = 0 ):
     tp = t
      
     for i in range(H):       
-        # print(f"************** i: {i} ********************")
-        # Get sigma points for neighbor's state and state derivative
         
-        #t0 = time.time()
+        # this takes log of time!!
+        t0 = time.time()
         leader_xdot_states, leader_xdot_weights = sigma_point_expand( follower_states[i], leader_states[i], leader_weights[i], leader, cur_t = tp )
-        #print(f"Time 1: {time.time()-t0}")
+        print(f"Time 1: {time.time()-t0}")
         
-        #t0 = time.time()
+        t0 = time.time()    
         leader_states_expanded, leader_weights_expanded = sigma_point_scale_up( leader_states[i], leader_weights[i])#leader_xdot_weights )
-        #print(f"Time 2: {time.time()-t0}")
-        
+        print(f"Time 2: {time.time()-t0}")
         # CBF derivative condition
-        # A, B = UT_Mean_Evaluator( cbf_condition_evaluator, follower, follower_states[i], leader_states_expanded, leader_xdot_states, leader_weights_expanded )
-        #t0 = time.time()
+
+        # This takes lot of time!!
+        t0 = time.time()
         A, B = UT_Mean_Evaluator( clf_cbf_fov_evaluator, follower, follower_states[i], leader_states_expanded, leader_xdot_states, leader_weights_expanded )
-        #print(f"Time 3: {time.time()-t0}")    
+        print(f"Time 3: {time.time()-t0}")    
               
-        # get nominal controller
-        #t0 = time.time()
+        t0 = time.time()
         leader_mean_position = get_mean_cov( leader_states[i], leader_weights[i], compute_cov=False )
-        #print(f"Time 4: {time.time()-t0}")
+        print(f"Time 4: {time.time()-t0}")  
         
-        #t0 = time.time()
         u_ref = follower.nominal_input_tensor( follower_states[i], leader_mean_position )
-        #print(f"Time 5: {time.time()-t0}")
         
-        # get CBF solution
-        #t0 = time.time()
+        t0 = time.time()
         solution,  = cbf_controller_layer( u_ref, A, B )
-        #print(f"Time 6: {time.time()-t0}")
+        print(f"Time 5: {time.time()-t0}")
         
-        # solution = u_ref
-        # print("solution", solution)
-        # A.sum().backward(retain_graph=True)
-        # print("************* hello *******************")
-        # Propagate follower and leader state forward
         follower_states.append( follower.step_torch( follower_states[i], solution, dt_outer ) )
         
         leader_next_state_expanded = leader_states_expanded + leader_xdot_states * dt_outer
         
-        #t0 = time.time()
+        t0 = time.time()
         leader_next_states, leader_next_weights = sigma_point_compress( leader_next_state_expanded, leader_xdot_weights )
-        #print(f"Time 7: {time.time()-t0}")
+        print(f"Time 6: {time.time()-t0}")  
         
         leader_states.append( leader_next_states ); leader_weights.append( leader_next_weights )
         
         # Get reward for this state and control input choice = Expected reward in general settings
-        reward_function = lambda a, b: follower.compute_reward(a, b, des_d = 0.7)
+        # reward_function = lambda a, b: follower.compute_reward(a, b, des_d = 0.7)
+        reward_function = follower.compute_reward
         
-        #t0 = time.time()
+        t0 = time.time()
         reward = reward + UT_Mean_Evaluator_basic( reward_function, follower_states[i+1], leader_states[i+1], leader_weights[i+1])
-        # print(f"Reward Checking for Nans: {torch.isnan(reward)}")
-        #print(f"Time 8: {time.time()-t0}")
+        print(f"Time 7: {time.time()-t0}")  
         
         tp = tp + dt_outer
-    # print(f"leader_states:{ leader_states[-1] }, follower_states:{follower_states[-1]}")
-    # print("forward prop done!")
+
     return reward
 
 def leader_motion_predict(t):
@@ -211,7 +201,7 @@ learn_period = 2
 gp_training_iter_init = 30
 train_gp = False
 outer_loop = 2
-H = 30# 5
+H = 5#30# 5
 gp_training_iter = 10
 d_min = 0.3
 d_max = 2.0

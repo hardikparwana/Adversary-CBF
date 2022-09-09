@@ -24,8 +24,8 @@ torch::Tensor foo( torch::Tensor x, torch::Tensor y){
 
 
 torch::Tensor bar2(torch::Tensor x, torch::Tensor y, torch::Tensor z){
-	for (int i=0; i<1000; i++){
-		for (int j=0; j<1000; j++){
+	for (int i=0; i<10; i++){
+		for (int j=0; j<10; j++){
 			z = z + i / (j+1) * torch::ones(3);
 		}
 	}
@@ -82,23 +82,13 @@ int main(){
 
 	auto t0 = std::chrono::system_clock::now();
 	bar2( torch::zeros(3), torch::zeros(3), torch::ones(3) );
-	bar2( torch::zeros(3), torch::zeros(3), torch::ones(3) );
-	bar2( torch::zeros(3), torch::zeros(3), torch::ones(3) );
-	bar2( torch::zeros(3), torch::zeros(3), torch::ones(3) );
-	bar2( torch::zeros(3), torch::zeros(3), torch::ones(3) );
-	bar2( torch::zeros(3), torch::zeros(3), torch::ones(3) );
 	auto tf = std::chrono::system_clock::now();
-	std::cout << "time spent " << std::chrono::duration_cast<std::chrono::milliseconds>(tf-t0).count() << std::endl;
+	std::cout << "time spent " << std::chrono::duration_cast<std::chrono::microseconds>(tf-t0).count()/1000000.0 << std::endl;
 
 	auto t02 = std::chrono::system_clock::now();
 	bar2( torch::zeros(3), torch::zeros(3), torch::ones(3) );
-	bar2( torch::zeros(3), torch::zeros(3), torch::ones(3) );
-	bar2( torch::zeros(3), torch::zeros(3), torch::ones(3) );
-	bar2( torch::zeros(3), torch::zeros(3), torch::ones(3) );
-	bar2( torch::zeros(3), torch::zeros(3), torch::ones(3) );
-	bar2( torch::zeros(3), torch::zeros(3), torch::ones(3) );
 	auto tf2 = std::chrono::system_clock::now();
-	std::cout << "time spent " << std::chrono::duration_cast<std::chrono::milliseconds>(tf2-t02).count() << std::endl;
+	std::cout << "time spent " << std::chrono::duration_cast<std::chrono::microseconds>(tf2-t02).count()/1000000.0 << std::endl;
 }
 
 

@@ -376,6 +376,7 @@ class Unicycle:
         
         return h1, dh1_dxi, dh1_dxj, h2, dh2_dxi, dh2_dxj, h3, dh3_dxi, dh3_dxj
     
+    # @torch.jit.script
     def compute_reward(self,X,targetX, des_d = 0.7):
         # return torch.square( torch.norm( X[0:2,0] - targetX[0:2,0]  ) - torch.tensor(des_d) )
         p = targetX[0:2] - X[0:2]
