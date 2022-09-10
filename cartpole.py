@@ -1,8 +1,3 @@
-# import gym 
-# import numpy as np
-# import time
-# # env = gym.make('Carx
-
 import gym
 env = gym.make("CartPole-v1", render_mode="human")
 observation, info = env.reset(seed=42)
@@ -28,6 +23,7 @@ env.close()
 
 def cartpole():
     env = gym.make("CartPole-v1")
+    
     observation_space = env.observation_space.shape[0]
     action_space = env.action_space.n
     dqn_solver = DQNSolver(observation_space, action_space)
@@ -45,3 +41,4 @@ def cartpole():
             state = state_next
             if terminal:
                 break
+        

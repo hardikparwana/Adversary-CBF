@@ -13,6 +13,11 @@ from gym import logger, spaces
 from gym.envs.classic_control import utils
 from gym.error import DependencyNotInstalled
 
+# For recording
+# from gym_recording.wrappers import TraceRecordingWrapper
+# from gym.wrappers.record_video import RecordVideo
+from gym_wrappers.record_video import RecordVideo
+
 class CustomCartPoleEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
     """
     ### Description
@@ -68,8 +73,8 @@ class CustomCartPoleEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
 
     def __init__(self, render_mode: Optional[str] = None):
         self.gravity = 9.8
-        self.masscart = 1.0
-        self.masspole = 0.1
+        self.masscart = 0.7 #1.0
+        self.masspole = 0.325 #0.1
         self.total_mass = self.masspole + self.masscart
         self.length = 0.5  # actually half the pole's length
         self.polemass_length = self.masspole * self.length
@@ -285,13 +290,20 @@ class CustomCartPoleEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
             self.isopen = False
 
 
-env = CustomCartPoleEnv(render_mode="human")
+env_to_render = CustomCartPoleEnv(render_mode="rgb_array")
+# env = TraceRecordingWrapper(env)
+# env = gym.wrappers.Monitor(env, "recording",force=True)
+env = RecordVideo( env_to_render, video_folder="/home/hardik/Desktop/", name_prefix="Excartpole" )
+# env.start_video_recorder()
 observation, info = env.reset(seed=42)
 
-for _ in range(1000):
+for _ in range(100):
     action = env.action_space.sample()
     observation, reward, terminated, truncated, info = env.step(action)
+    env.render()
 
     if terminated or truncated:
         observation, info = env.reset()
+        
+env.close_video_recorder()
 env.close()
