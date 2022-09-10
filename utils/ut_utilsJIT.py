@@ -50,50 +50,66 @@ def generate_sigma_points_JIT( mu, cov_root ):
 
     return new_points, new_weights
 
-def predict_function_jit(cur_t): 
-    mu = torch.zeros((2,1)).reshape(-1,1)
-    cov = torch.zeros((2,2))
+mu_t = torch.ones((2,1)).reshape(-1,1)
+cov_t = torch.tensor([ [ 1.0, 0.0 ], [0.0, 3.0] ])
+traced_generate_sigma_points_JIT = torch.jit.trace( generate_sigma_points_JIT, ( mu_t, cov_t ) )
+
+def predict_function_jit(cur_t, noise): 
+    # mu = torch.zeros((2,1)).reshape(-1,1)
+    # cov = torch.zeros((2,2))
+    # return mu, cov
+    print("cur_t", cur_t)
+    uL = 0.5
+    vL = 3*np.sin(np.pi*cur_t*4) #  0.1 # 1.2
+    mu = torch.tensor([[uL, vL]], dtype=torch.float).reshape(-1,1)
+    cov = torch.zeros((2,2), dtype=torch.float)
+    cov[0,0] = noise
+    cov[1,1] = noise
     return mu, cov
+traced_predict_function_jit = torch.jit.trace( predict_function_jit, ( torch.tensor(1), torch.tensor(0.2) ) )
+
+
+def get_ut_cov_root(cov):
+    k = 2
+    if torch.linalg.det( cov )< 0.01:
+        root_term = cov
+    else:
+        root_term = sqrtm((n+k)*cov)
+    return root_term
 
 # @torch.jit.script
-def sigma_point_expand_JIT(robot_state, sigma_points, weights, cur_t):
-    global traced_generate_sigma_points_JIT
+def sigma_point_expand_JIT(robot_state, sigma_points, weights, cur_t, noise):
+   
     n, N = sigma_points.shape
-    
+   
     # sys_state = torch.cat( (robot_state.T, sigma_points[:,i].reshape(-1,1).T), 1 )
     sys_state = sigma_points[:,0].reshape(-1,1).T
     
     # mu, cov = leader.gp.predict_torch( sys_state ) # all are tensors here
-    mu, cov = predict_function_jit(cur_t)  
+    mu, cov = traced_predict_function_jit(cur_t, noise)  
     
-    k = 2
-    if np.linalg.det( cov.detach().numpy() )< 0.01:
-        root_term = cov
-    else:
-        root_term = sqrtm((n+k)*cov)
+    root_term = get_ut_cov_root(cov) 
     
+    # if first_generate_sigma_run:
+    #     traced_generate_sigma_points_JIT = torch.jit.trace( generate_sigma_points_JIT, ( mu, root_term ) )
     temp_points, temp_weights = traced_generate_sigma_points_JIT( mu, root_term )
     new_points = torch.clone( temp_points )
-    new_weights = torch.clone( temp_weights )
+    new_weights = (torch.clone( temp_weights ) * weights[0,0]).reshape(1,-1)
         
     for i in range(1,N):
         # sys_state = torch.cat( (robot_state.T, sigma_points[:,i].reshape(-1,1).T), 1 )
         sys_state = sigma_points[:,i].reshape(-1,1).T
         
         # mu, cov = leader.gp.predict_torch( sys_state ) # all are tensors here
-        mu, cov = predict_function_jit(cur_t)  
+        mu, cov = traced_predict_function_jit(cur_t, noise)  
         
         # TODO
-        root_term = cov
-        if np.linalg.det( cov.detach().numpy() )< 0.01:
-            root_term = cov
-        else:
-            root_term = sqrtm((n+k)*cov)
+        root_term = get_ut_cov_root(cov)        
         
         temp_points, temp_weights = traced_generate_sigma_points_JIT( mu, root_term )
 
         new_points = torch.cat((new_points, temp_points), dim=1 )
-        new_weights = torch.cat( (new_weights, (temp_weights * weights[0,i]).reshape(-1,1) ) , 1 )
+        new_weights = torch.cat( (new_weights, (temp_weights * weights[0,i]).reshape(1,-1) ) , dim=1 )
             
         # print("new_points",new_points)
     return new_points, new_weights
@@ -102,7 +118,8 @@ def sigma_point_expand_JIT(robot_state, sigma_points, weights, cur_t):
 def sigma_point_compress_JIT( sigma_points, weights ):
     mu, cov = get_mean_cov_JIT( sigma_points, weights )
     # TODO send root term
-    return generate_sigma_points_JIT( mu, cov, cov )
+    cov_root_term = get_ut_cov_root( cov )  
+    return generate_sigma_points_JIT( mu, cov_root_term )
 
 # @torch.jit.script
 def sigma_point_scale_up5_JIT( sigma_points, weights ):
@@ -157,6 +174,8 @@ def unicycle_SI2D_cbf_fov_condition_evaluator( robotJ_state, robotK_state, robot
     
     B = torch.cat( (B1, B2, B3), dim = 0 )
     A = torch.cat( (A1, A2, A3), dim = 0 )
+    
+    # print(f"h1:{h1}, , h2:{h2}, h3:{h3}")
     
     return A, B
 

@@ -44,50 +44,52 @@ def unicycle_SI2D_lyapunov_tensor_jit(X, G):
 
 @torch.jit.script
 def unicycle_SI2D_barrier_torch_jit(X, targetX): # target is unicycle
-        beta = 1.01
-        min_D = 0.3
-        h = beta*min_D**2 -  torch.square( torch.norm(X[0:2] - targetX[0:2])  )
-        h1 = h
-        
-        theta = X[2,0]
-        s = (X[0:2] - targetX[0:2]).T @ torch.cat( ( torch.cos(X[2,0]).reshape(-1,1), torch.sin(X[2,0]).reshape(-1,1) ) )
-        h_final = h - sigma_torch(s)
-        # print(f"h1:{h1}, h2:{h}")
-        # assert(h1<0)
-        der_sigma = sigma_der_torch(s)
-        dh_dxi =  torch.cat( ( -2*( X[0:2] - targetX[0:2] ).T - der_sigma @ torch.cat( (torch.sin(X[2,0]).reshape(-1,1), torch.cos(X[2,0]).reshape(-1,1)), dim = 1 ) ,  - der_sigma * ( torch.cos(X[2,0]).reshape(-1,1) @ ( X[0,0]-targetX[0,0] ).reshape(-1,1) - torch.sin(X[2,0]).reshape(-1,1) @ ( X[1,0] - targetX[1,0] ).reshape(-1,1) ) ), dim = 1)
-        
-        # Unicycle only
-        dh_dxj = torch.cat( ( -2*( X[0:2] - targetX[0:2] ).T + der_sigma @ torch.cat( (torch.sin(X[2,0]).reshape(-1,1), torch.cos(X[2,0]).reshape(-1,1)),1 ) , torch.tensor([[0]]) ) , 1)
-        
-        return -h_final, -dh_dxi, -dh_dxj
+    beta = 1.01
+    min_D = 0.3
+    h = beta*min_D**2 -  torch.square( torch.norm(X[0:2] - targetX[0:2])  )
+    h1 = h
+    
+    theta = X[2,0]
+    s = (X[0:2] - targetX[0:2]).T @ torch.cat( ( torch.cos(X[2,0]).reshape(-1,1), torch.sin(X[2,0]).reshape(-1,1) ) )
+    h_final = h - sigma_torch(s)
+    # print(f"h1:{h1}, h2:{h}")
+    # assert(h1<0)
+    der_sigma = sigma_der_torch(s)
+    dh_dxi =  torch.cat( ( -2*( X[0:2] - targetX[0:2] ).T - der_sigma @ torch.cat( (torch.sin(X[2,0]).reshape(-1,1), torch.cos(X[2,0]).reshape(-1,1)), dim = 1 ) ,  - der_sigma * ( torch.cos(X[2,0]).reshape(-1,1) @ ( X[0,0]-targetX[0,0] ).reshape(-1,1) - torch.sin(X[2,0]).reshape(-1,1) @ ( X[1,0] - targetX[1,0] ).reshape(-1,1) ) ), dim = 1)
+    
+    # Unicycle only
+    dh_dxj = torch.cat( ( -2*( X[0:2] - targetX[0:2] ).T + der_sigma @ torch.cat( (torch.sin(X[2,0]).reshape(-1,1), torch.cos(X[2,0]).reshape(-1,1)),1 ) , torch.tensor([[0]]) ) , 1)
+    
+    return -h_final, -dh_dxi, -dh_dxj
     
 @torch.jit.script
 def unicycle_SI2D_barrier_torch_jit(X, targetX): # target is unicycle
-        beta = 1.01
-        min_D = 0.3
-        h = beta*min_D**2 -  torch.square( torch.norm(X[0:2] - targetX[0:2])  )
-        h1 = h
-        
-        theta = X[2,0]
-        s = (X[0:2] - targetX[0:2]).T @ torch.cat( ( torch.cos(X[2,0]).reshape(-1,1), torch.sin(X[2,0]).reshape(-1,1) ) )
-        h_final = h - sigma_torch(s)
-        # print(f"h1:{h1}, h2:{h}")
-        # assert(h1<0)
-        der_sigma = sigma_der_torch(s)
-        dh_dxi = torch.cat( ( -2*( X[0:2] - targetX[0:2] ).T - der_sigma @ torch.cat( (torch.sin(X[2,0]).reshape(-1,1), torch.cos(X[2,0]).reshape(-1,1)),1 ) ,  - der_sigma * ( torch.cos(X[2,0]).reshape(-1,1) @ ( X[0,0]-targetX[0,0] ).reshape(-1,1) - torch.sin(X[2,0]).reshape(-1,1) @ ( X[1,0] - targetX[1,0] ).reshape(-1,1) ) ), 1)
-        # dh_dxi = torch.tensor(0)
-        # Unicycle only
-        dh_dxj = 2*( X[0:2] - targetX[0:2] ).T # row
-        
-        return -h_final, -dh_dxi, -dh_dxj
+    beta = 1.01
+    min_D = 0.3
+    h = beta*min_D**2 -  torch.square( torch.norm(X[0:2] - targetX[0:2])  )
+    h1 = h
+    
+    theta = X[2,0]
+    s = (X[0:2] - targetX[0:2]).T @ torch.cat( ( torch.cos(X[2,0]).reshape(-1,1), torch.sin(X[2,0]).reshape(-1,1) ) )
+    h_final = h - sigma_torch(s)
+    # print(f"h1:{h1}, h2:{h}")
+    # assert(h1<0)
+    der_sigma = sigma_der_torch(s)
+    dh_dxi = torch.cat( ( -2*( X[0:2] - targetX[0:2] ).T - der_sigma @ torch.cat( (torch.sin(X[2,0]).reshape(-1,1), torch.cos(X[2,0]).reshape(-1,1)),1 ) ,  - der_sigma * ( torch.cos(X[2,0]).reshape(-1,1) @ ( X[0,0]-targetX[0,0] ).reshape(-1,1) - torch.sin(X[2,0]).reshape(-1,1) @ ( X[1,0] - targetX[1,0] ).reshape(-1,1) ) ), 1)
+    # dh_dxi = torch.tensor(0)
+    # Unicycle only
+    dh_dxj = 2*( X[0:2] - targetX[0:2] ).T # row
+    
+    return -h_final, -dh_dxi, -dh_dxj
 
 @torch.jit.script
 def unicycle_SI2D_fov_barrier_jit(X, targetX):
     
+    # print(f"X:{X}, targetX:{targetX}")
+    
     max_D = 2.0
-    min_D = 2.0
-    FoV_angle = 3.13/3
+    min_D = 0.3
+    FoV_angle = 3.14157/3
     
     # Max distance
     h1 = max_D**2 - torch.square( torch.norm( X[0:2] - targetX[0:2] ) )
@@ -113,33 +115,35 @@ def unicycle_SI2D_fov_barrier_jit(X, targetX):
     dh3_dxi = torch.cat(  ( -dh3_dx , dh3_dTheta), 1  ) /(1.0-torch.cos(FoV_angle/2))
     dh3_dxj = dh3_dx /(1.0-torch.cos(FoV_angle/2))
     
+    # print(f"dist_sq:{torch.square(torch.norm( X[0:2] - targetX[0:2] ))}, h1:{h1}, h2:{h2}, h3:{h3}")
+    
     return h1, dh1_dxi, dh1_dxj, h2, dh2_dxi, dh2_dxj, h3, dh3_dxi, dh3_dxj
 
 @torch.jit.script
 def unicycle_compute_reward_jit(X,targetX):
     
-        max_D = 2.0
-        min_D = 2.0
-        FoV_angle = 3.13/3    
+    max_D = 2.0
+    min_D = 0.3
+    FoV_angle = 3.13/3    
+
+    p = targetX[0:2] - X[0:2]
+    dir_vector = torch.cat( ( torch.cos(X[2,0]).reshape(-1,1), torch.sin(X[2,0]).reshape(-1,1) ) )
+    bearing_angle  = torch.matmul(dir_vector.T , p )/ torch.norm(p)
+    h3 = (bearing_angle - torch.cos(FoV_angle/2))/(1.0-torch.cos(FoV_angle/2))
     
-        p = targetX[0:2] - X[0:2]
-        dir_vector = torch.cat( ( torch.cos(X[2,0]).reshape(-1,1), torch.sin(X[2,0]).reshape(-1,1) ) )
-        bearing_angle  = torch.matmul(dir_vector.T , p )/ torch.norm(p)
-        h3 = (bearing_angle - torch.cos(FoV_angle/2))/(1.0-torch.cos(FoV_angle/2))
-        
-        return torch.square( torch.norm( X[0:2,0] - targetX[0:2,0]  ) - torch.tensor((min_D+max_D)/2) ) - 2 * h3
+    return torch.square( torch.norm( X[0:2,0] - targetX[0:2,0]  ) - torch.tensor((min_D+max_D)/2) ) - 2 * h3
     
 def unicycle_nominal_input_tensor_jit(X, targetX):
-        k_omega = 2.0 #0.5#2.5
-        k_v = 2.0 #0.5
-        diff = targetX[0:2,0] - X[0:2,0]
+    k_omega = 2.0 #0.5#2.5
+    k_v = 2.0 #0.5
+    diff = targetX[0:2,0] - X[0:2,0]
 
-        theta_d = torch.atan2(targetX[1,0]-X[1,0],targetX[0,0]-X[0,0])
-        error_theta = wrap_angle_tensor_JIT( theta_d - X[2,0] )
+    theta_d = torch.atan2(targetX[1,0]-X[1,0],targetX[0,0]-X[0,0])
+    error_theta = wrap_angle_tensor_JIT( theta_d - X[2,0] )
 
-        omega = k_omega*error_theta 
-        v = k_v*( torch.norm(diff) ) * torch.cos( error_theta )
-        v = v.reshape(-1,1)
-        omega = omega.reshape(-1,1)
-        U = torch.cat((v,omega))
-        return U
+    omega = k_omega*error_theta 
+    v = k_v*( torch.norm(diff) ) * torch.cos( error_theta )
+    v = v.reshape(-1,1)
+    omega = omega.reshape(-1,1)
+    U = torch.cat((v,omega))
+    return U

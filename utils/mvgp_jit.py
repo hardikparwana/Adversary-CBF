@@ -37,7 +37,7 @@ def get_X_cov_torch_jit(self,X_obs_torch, Xnew):
         K_star_torch[i,0] = evaluate_kernel_torch_gaussian_jit(X_obs_torch[i,:], Xnew)
     return K_star_torch
 
-# @jit( nopython=True )
+@jit( nopython=True )
 class MVGP:
     """
     General purpose Gaussian process model
@@ -84,15 +84,6 @@ class MVGP:
         
         self.kstars = []
         self.kernel_type = kernel_type #'Gaussian'
-
-    def load_parameters(self, file_name):
-        # open a file, where you stored the pickled data
-        file = open(file_name, 'rb')
-        data = pickle.load(file)
-        file.close()
-        self.omega = data['omega']
-        self.sigma = data['sigma']
-        self.l = data['l']
 
     # Set/update input data for model
     def set_XY(self, X, Y):
@@ -206,34 +197,34 @@ class MVGP:
     
 
     
-    # for prediction in torch
-    def initialize_torch(self):
-        self.K_obs_torch = torch.tensor(self.K_obs, dtype = torch.float )
-        self.Y_obs_torch = torch.tensor( self.Y_obs, dtype = torch.float )
-        self.X_obs_torch = torch.tensor( self.X_obs, dtype=torch.float )
-        self.K_star_torch = torch.zeros( (self.N_data,1), dtype=torch.float )
-        self.omega_torch = torch.tensor( self.omega, dtype=torch.float )
-        self.l_torch = torch.tensor( self.l, dtype=torch.float )
-        self.sigma_torch = torch.tensor( self.sigma, dtype=torch.float )
-        self.L_torch = torch.tensor( self.L, dtype=torch.float )
-        self.p_torch = torch.tensor( self.p, dtype=torch.float )
-        self.K_inv_torch = torch.inverse(self.K_obs_torch)
-        self.kstars = []
+    # # for prediction in torch
+    # def initialize_torch(self):
+    #     self.K_obs_torch = torch.tensor(self.K_obs, dtype = torch.float )
+    #     self.Y_obs_torch = torch.tensor( self.Y_obs, dtype = torch.float )
+    #     self.X_obs_torch = torch.tensor( self.X_obs, dtype=torch.float )
+    #     self.K_star_torch = torch.zeros( (self.N_data,1), dtype=torch.float )
+    #     self.omega_torch = torch.tensor( self.omega, dtype=torch.float )
+    #     self.l_torch = torch.tensor( self.l, dtype=torch.float )
+    #     self.sigma_torch = torch.tensor( self.sigma, dtype=torch.float )
+    #     self.L_torch = torch.tensor( self.L, dtype=torch.float )
+    #     self.p_torch = torch.tensor( self.p, dtype=torch.float )
+    #     self.K_inv_torch = torch.inverse(self.K_obs_torch)
+    #     self.kstars = []
         
-    def evaluate_kernel_torch(self, x1, x2):
-        diff = torch.norm(x1 - x2)
-        if self.kernel_type == 'Gaussian':            
-            return self.sigma_torch**2 * torch.exp(-diff**2 / (2*self.l_torch**2))
-        elif self.kernel_type == 'Periodic':
-            return torch.exp( -2/self.L_torch**2 * ( torch.sin( np.pi * diff**2 / self.p_torch ))**2 )
-        elif self.kernel_type == 'Gaussian + Periodic':
-            return self.sigma_torch**2 * torch.exp(-diff**2 / (2*self.l_torch**2)) + torch.exp( -2/self.L_torch**2 * ( torch.sin( np.pi * diff**2 / self.p_torch ))**2 )
+    # def evaluate_kernel_torch(self, x1, x2):
+    #     diff = torch.norm(x1 - x2)
+    #     if self.kernel_type == 'Gaussian':            
+    #         return self.sigma_torch**2 * torch.exp(-diff**2 / (2*self.l_torch**2))
+    #     elif self.kernel_type == 'Periodic':
+    #         return torch.exp( -2/self.L_torch**2 * ( torch.sin( np.pi * diff**2 / self.p_torch ))**2 )
+    #     elif self.kernel_type == 'Gaussian + Periodic':
+    #         return self.sigma_torch**2 * torch.exp(-diff**2 / (2*self.l_torch**2)) + torch.exp( -2/self.L_torch**2 * ( torch.sin( np.pi * diff**2 / self.p_torch ))**2 )
 
-    def get_X_cov_torch(self,Xnew):
-        N = self.N_data
-        for i in range(N):
-            self.K_star_torch[i,0] = self.evaluate_kernel_torch(self.X_obs_torch[i,:], Xnew)
-        return self.K_star_torch
+    # def get_X_cov_torch(self,Xnew):
+    #     N = self.N_data
+    #     for i in range(N):
+    #         self.K_star_torch[i,0] = evaluate_kernel_torch_gaussian(self.X_obs_torch[i,:], Xnew)
+    #     return self.K_star_torch
     
     # For TRAINING
     

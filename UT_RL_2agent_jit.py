@@ -17,6 +17,10 @@ from utils.mvgp import *
 
 torch.autograd.set_detect_anomaly(True)
 
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning) 
+warnings.filterwarnings("ignore", category=torch.jit.TracerWarning) 
+
 
 #############################################################
 # CBF Controller: centralized
@@ -78,8 +82,9 @@ traced_sigma_point_compress_JIT = []
 traced_unicycle_reward_UT_Mean_Evaluator_basic = []
 
 first_run = True
+first_generate_sigma_run = True
     
-def get_future_reward( follower, leader, t = 0 ):
+def get_future_reward( follower, leader, t = 0, noise = torch.tensor(0) ):
     # Initialize sigma points for other robots
     follower_states = [torch.clone(follower.X_torch)]        
     prior_leader_states, prior_leader_weights = initialize_sigma_points2_JIT(leader.X_torch)
@@ -90,12 +95,12 @@ def get_future_reward( follower, leader, t = 0 ):
     global first_run, traced_sigma_point_expand_JIT, traced_sigma_point_scale_up5_JIT, traced_unicycle_SI2D_UT_Mean_Evaluator, traced_get_mean_JIT, traced_unicycle_nominal_input_tensor_jit, traced_cbf_controller_layer, traced_sigma_point_compress_JIT, traced_unicycle_reward_UT_Mean_Evaluator_basic
     tp = t
     start_t = 1
-    print("t",t)
+    # print("t",t)
     if (first_run):
         print("**************************** t ******************************* ", t)
         i = 0
-        traced_sigma_point_expand_JIT = torch.jit.trace( sigma_point_expand_JIT, ( follower_states[i], leader_states[i], leader_weights[i], torch.tensor(tp) ) )
-        leader_xdot_states, leader_xdot_weights = sigma_point_expand_JIT( follower_states[i], leader_states[i], leader_weights[i] )       
+        traced_sigma_point_expand_JIT = sigma_point_expand_JIT #torch.jit.script( sigma_point_expand_JIT, ( follower_states[i], leader_states[i], leader_weights[i], torch.tensor(tp) ) )
+        leader_xdot_states, leader_xdot_weights = sigma_point_expand_JIT( follower_states[i], leader_states[i], leader_weights[i], torch.tensor(tp), noise )       
         
         traced_sigma_point_scale_up5_JIT = torch.jit.trace( sigma_point_scale_up5_JIT, ( leader_states[i], leader_weights[i] ) )
         leader_states_expanded, leader_weights_expanded = sigma_point_scale_up5_JIT( leader_states[i], leader_weights[i] )#leader_xdot_weights )
@@ -111,12 +116,13 @@ def get_future_reward( follower, leader, t = 0 ):
         
         # traced_cbf_controller_layer = torch.jit.trace( cbf_controller_layer, ( u_ref, A, B ) )
         solution,  = cbf_controller_layer( u_ref, A, B )
+        print("solution", solution)
         
         follower_states.append( follower.step_torch( follower_states[i], solution, dt_outer ) )        
         leader_next_state_expanded = leader_states_expanded + leader_xdot_states * dt_outer
         
         #t0 = time.time()
-        traced_sigma_point_compress_JIT = torch.jit.trace( sigma_point_compress_JIT, ( leader_next_state_expanded, leader_xdot_weights ) )
+        traced_sigma_point_compress_JIT = sigma_point_compress_JIT #torch.jit.trace( sigma_point_compress_JIT, ( leader_next_state_expanded, leader_xdot_weights ) )
         leader_next_states, leader_next_weights = traced_sigma_point_compress_JIT( leader_next_state_expanded, leader_xdot_weights )
         
         leader_states.append( leader_next_states ); leader_weights.append( leader_next_weights )
@@ -133,19 +139,21 @@ def get_future_reward( follower, leader, t = 0 ):
     
     for i in range(start_t,H):       
         
-        leader_xdot_states, leader_xdot_weights = traced_sigma_point_expand_JIT( follower_states[i], leader_states[i], leader_weights[i], torch.tensor(tp) )
+        leader_xdot_states, leader_xdot_weights = traced_sigma_point_expand_JIT( follower_states[i], leader_states[i], leader_weights[i], torch.tensor(tp), noise )
         #print(f"Time 1: {time.time()-t0}")
         
         leader_states_expanded, leader_weights_expanded = traced_sigma_point_scale_up5_JIT( leader_states[i], leader_weights[i])#leader_xdot_weights )
-
-        t0 = time.time()
+        # print(f"time:{tp}, leader_states_expanded:{leader_states_expanded}")
+        # t0 = time.time()
         A, B = traced_unicycle_SI2D_UT_Mean_Evaluator( follower_states[i], leader_states_expanded, leader_xdot_states, leader_weights_expanded, follower.k_torch, follower.alpha_torch )
-        print(f"Time 3: {time.time()-t0}")    
+        # print(f"Time 3: {time.time()-t0}")    
               
         leader_mean_position = traced_get_mean_JIT( leader_states[i], leader_weights[i] )        
+        # print(f"leader_mean:{leader_mean_position.T}, follower:{ follower_states[-1].T }")
         u_ref = traced_unicycle_nominal_input_tensor_jit( follower_states[i], leader_mean_position )
         
         solution,  = cbf_controller_layer( u_ref, A, B )
+        # print("solution", solution)
         #print(f"Time 6: {time.time()-t0}")
         
         follower_states.append( follower.step_torch( follower_states[i], solution, dt_outer ) )        
@@ -192,12 +200,12 @@ def leader_predict(t, noise = 0.0):
 ################################################################
 
 # Sim Parameters
-num_steps = 50 #100 #200 #200
-learn_period = 2
+num_steps = 100#50 #100 #200 #200
+learn_period = 1#2
 gp_training_iter_init = 30
 train_gp = False
 outer_loop = 2
-H = 5#30# 5
+H = 30# 5
 gp_training_iter = 10
 d_min = 0.3
 d_max = 2.0
@@ -230,96 +238,9 @@ adapt_noise_movie_name = 'Take8_adapt_noise.mp4'
 plt.ion()
 
 
-    # # Without adapt
+## Without noise: perfect knowledge??
 
-    # metadata = dict(title='Movie No Adapt', artist='Matplotlib',comment='Movie support!')
-    # writer = FFMpegWriter(fps=15, metadata=metadata)
-
-    # t = 0
-    # first_time = True
-    # fig = plt.figure()
-    # ax = plt.axes(xlim=plot_x_lim,ylim=plot_y_lim)
-    # ax.set_xlabel("X")
-    # ax.set_ylabel("Y")
-    # ax.set_aspect(1)
-
-    # follower = Unicycle(follower_init_pose, dt_inner, ax, num_robots=num_robots, id = 0, min_D = d_min, max_D = d_max, FoV_angle = angle_max, color='g',palpha=1.0, alpha=alpha_cbf, k = k_clf, num_alpha = 3)
-    # leader = SingleIntegrator2D(leader_init_pose, dt_inner, ax, color='r',palpha=1.0, target = 0, predict_function = leader_predict)
-
-    # # Initialize GP
-
-    # leader.gp = gp = MVGP( omega = omega, sigma = sigma, l = l, noise = 0.05, horizon=300 )
-
-    # step_rewards = []
-    # gp_pred_x = []
-    # gp_pred_y = []
-    # true_x = []
-    # true_y = []
-    # gp_pred_x_cov = []
-    # gp_pred_y_cov = []
-
-    # with writer.saving(fig, no_adapt_movie_name, 100): 
-    #     for i in range(num_steps):
-
-    #         # High frequency
-    #         if i % outer_loop != 0 or i<learn_period:
-    #             # print("follower alpha fast", follower.alpha)
-    #             # move other agent
-    #             # u_leader = np.array([ 1,1 ]).reshape(-1,1)
-    #             uL, vL = leader_motion(t)       
-                
-    #             u_leader = np.array([ uL, vL ]).reshape(-1,1)
-                
-    #             leader.step(u_leader, dt_inner)
-                
-    #             # implement controller
-    #             initialize_tensors(follower, leader)
-    #             u_ref = unicycle_nominal_input_tensor_jit( follower.X_torch, leader.X_torch )
-    #             A, B = compute_A1_b1_tensor( follower, leader, follower.X_torch, leader.X_torch )
-    #             solution,  = cbf_controller_layer( u_ref, A, B )
-    #             # print("u_follower",u_follower)
-    #             follower.step(solution.detach().numpy(), dt_inner)
-                
-    #             # print(f"reward computation: f:{ follower.X.T }, L:{leader.X.T}")
-    #             step_rewards.append( follower.lyapunov(follower.X, leader.X) )
-                
-    #             t = t + dt_inner
-                
-    #         # Low Frequency tuning
-    #         else: 
-    #             initialize_tensors(follower, leader)
-                
-    #             # Train GP
-    #             # train_x = np.append( np.copy(follower.Xs[:,-max_history:].T), np.copy(leader.Xs[:,-max_history:].T) , axis = 1  )
-    #             train_x = np.copy(leader.Xs[:,-max_history:]).T
-    #             train_y = np.copy(leader.Xdots[:,-max_history:].T)
-    #             # shuffle data??  TODO
-    #             leader.gp.set_XY(train_x, train_y)
-    #             leader.gp.resample( n_samples = 50 )
-    #             if train_gp:
-    #                 if first_time:
-    #                     leader.gp.train(max_iters=gp_training_iter_init, n_samples = 50, print_status = print_status)
-    #                     first_time = False
-    #                 else:
-    #                     leader.gp.train(max_iters=10, n_samples = 50, print_status = print_status)
-    #             leader.gp.resample_obs( n_samples = 50 )
-    #             leader.gp.get_obs_covariance()
-    #             leader.gp.initialize_torch()
-                
-    #             # true_x.append(uL)
-    #             # true_y.append(vL)
-    #             # mu, cov = leader.gp.predict( leader.X.T )
-    #             # mu, cov = leader.predict_function( t )
-    #             # gp_pred_x.append( mu[0,0] )
-    #             # gp_pred_y.append( mu[0,1] )
-    #             # gp_pred_x_cov.append( np.sqrt(cov[0,0]) )
-    #             # gp_pred_y_cov.append( np.sqrt(cov[1,1]) )
-                
-    #         fig.canvas.draw()
-    #         fig.canvas.flush_events()
-    #         writer.grab_frame()
-
-# With adapt: noise 0.0
+noise  = 0.0
 
 metadata = dict(title='Movie Adapt 0', artist='Matplotlib',comment='Movie support!')
 writer = FFMpegWriter(fps=15, metadata=metadata)
@@ -334,9 +255,9 @@ ax.set_ylabel("Y")
 ax.set_aspect(1)
 
 follower = Unicycle(follower_init_pose, dt_inner, ax, num_robots=num_robots, id = 0, min_D = d_min, max_D = d_max, FoV_angle = angle_max, color='g',palpha=1.0, alpha=alpha_cbf, k = k_clf, num_alpha = 3 )
-leader = SingleIntegrator2D(leader_init_pose, dt_inner, ax, color='r',palpha=1.0, target = 0, predict_function = lambda a: leader_predict(a, noise = 0.0))
+leader = SingleIntegrator2D(leader_init_pose, dt_inner, ax, color='r',palpha=1.0, target = 0, predict_function = lambda a: leader_predict(a, noise = noise) )
 
-print("kkk: ", follower.ks)
+# print("kkk: ", follower.ks)
 
 # Initialize GP
 leader.gp = gp = MVGP( omega = omega, sigma = sigma, l = l, noise = 0.05, horizon=300 )
@@ -369,7 +290,7 @@ with writer.saving(fig, adapt_no_noise_movie_name, 100):
             # print("u_follower",u_follower)
             follower.step(solution.detach().numpy(), dt_inner)
             
-            print(f"reward computation: f:{ follower.X.T }, L:{leader.X.T}")
+            # print(f"reward computation: f:{ follower.X.T }, L:{leader.X.T}")
             step_rewards_adapt.append( follower.lyapunov(follower.X, leader.X) )
             
             t = t + dt_inner
@@ -405,7 +326,7 @@ with writer.saving(fig, adapt_no_noise_movie_name, 100):
             # gp_pred_y_cov_adapt.append( np.sqrt(cov[1,1]) )
             
             # t0 = time.time()
-            reward = get_future_reward( follower, leader, t = t)
+            reward = get_future_reward( follower, leader, t = t, noise = torch.tensor(noise))
             # print(f"Forward time: {time.time()-t0}")
 
             # t0 = time.time()
@@ -438,117 +359,117 @@ with writer.saving(fig, adapt_no_noise_movie_name, 100):
 
 
 
-# With adapt: noise 0.0
-
-metadata = dict(title='Movie Adapt Noise', artist='Matplotlib',comment='Movie support!')
-writer = FFMpegWriter(fps=15, metadata=metadata)
+# # With adapt: noise 3.0
+# noise = 3.0
+# metadata = dict(title='Movie Adapt Noise', artist='Matplotlib',comment='Movie support!')
+# writer = FFMpegWriter(fps=15, metadata=metadata)
         
         
-t = 0
-first_time = True
-fig = plt.figure()
-ax = plt.axes(xlim=plot_x_lim,ylim=plot_y_lim)
-ax.set_xlabel("X")
-ax.set_ylabel("Y")
-ax.set_aspect(1)
+# t = 0
+# first_time = True
+# fig = plt.figure()
+# ax = plt.axes(xlim=plot_x_lim,ylim=plot_y_lim)
+# ax.set_xlabel("X")
+# ax.set_ylabel("Y")
+# ax.set_aspect(1)
 
-follower_noise = Unicycle(follower_init_pose, dt_inner, ax, num_robots=num_robots, id = 0, min_D = d_min, max_D = d_max, FoV_angle = angle_max, color='g',palpha=1.0, alpha=alpha_cbf, k = k_clf, num_alpha = 3 )
-leader = SingleIntegrator2D(leader_init_pose, dt_inner, ax, color='r',palpha=1.0, target = 0, predict_function = lambda a: leader_predict(a, noise = 3.0))
+# follower_noise = Unicycle(follower_init_pose, dt_inner, ax, num_robots=num_robots, id = 0, min_D = d_min, max_D = d_max, FoV_angle = angle_max, color='g',palpha=1.0, alpha=alpha_cbf, k = k_clf, num_alpha = 3 )
+# leader = SingleIntegrator2D(leader_init_pose, dt_inner, ax, color='r',palpha=1.0, target = 0, predict_function = lambda a: leader_predict(a, noise = 3.0))
 
-print("kkk: ", follower_noise.ks)
+# print("kkk: ", follower_noise.ks)
 
-# Initialize GP
-leader.gp = gp = MVGP( omega = omega, sigma = sigma, l = l, noise = 0.05, horizon=300 )
+# # Initialize GP
+# leader.gp = gp = MVGP( omega = omega, sigma = sigma, l = l, noise = 0.05, horizon=300 )
 
-step_rewards_adapt_noise = []
-gp_pred_x_adapt = []
-gp_pred_y_adapt = []
-true_x_adapt = []
-true_y_adapt = []
-gp_pred_x_cov_adapt = []
-gp_pred_y_cov_adapt = []
+# step_rewards_adapt_noise = []
+# gp_pred_x_adapt = []
+# gp_pred_y_adapt = []
+# true_x_adapt = []
+# true_y_adapt = []
+# gp_pred_x_cov_adapt = []
+# gp_pred_y_cov_adapt = []
 
-with writer.saving(fig, adapt_noise_movie_name, 100): 
+# with writer.saving(fig, adapt_noise_movie_name, 100): 
 
-    for i in range(num_steps):
+#     for i in range(num_steps):
 
-        # High frequency
-        if i % outer_loop != 0 or i<learn_period:
+#         # High frequency
+#         if i % outer_loop != 0 or i<learn_period:
         
-            uL, vL = leader_motion(t)
-            u_leader = np.array([ uL, vL ]).reshape(-1,1)
+#             uL, vL = leader_motion(t)
+#             u_leader = np.array([ uL, vL ]).reshape(-1,1)
             
-            leader.step(u_leader, dt_inner)
+#             leader.step(u_leader, dt_inner)
             
-            # implement controller
-            initialize_tensors(follower_noise, leader)
-            u_follower = get_follower_input(follower_noise, leader)
-            # print("u_follower",u_follower)
-            follower_noise.step(u_follower.detach().numpy(), dt_inner)
-            print(f"reward computation: f:{ follower_noise.X.T }, L:{leader.X.T}")
-            step_rewards_adapt_noise.append( follower_noise.lyapunov(follower_noise.X, leader.X) )
+#             # implement controller
+#             initialize_tensors(follower_noise, leader)
+#             u_follower = get_follower_input(follower_noise, leader)
+#             # print("u_follower",u_follower)
+#             follower_noise.step(u_follower.detach().numpy(), dt_inner)
+#             print(f"reward computation: f:{ follower_noise.X.T }, L:{leader.X.T}")
+#             step_rewards_adapt_noise.append( follower_noise.lyapunov(follower_noise.X, leader.X) )
             
-            t = t + dt_inner
+#             t = t + dt_inner
             
-        # Low Frequency tuning
-        else: 
-            initialize_tensors(follower_noise, leader)
+#         # Low Frequency tuning
+#         else: 
+#             initialize_tensors(follower_noise, leader)
 
-            # Train GP
-            # train_x = np.append( np.copy(follower.Xs[:,-max_history:].T), np.copy(leader.Xs[:,-max_history:].T) , axis = 1  )
-            train_x = np.copy(leader.Xs[:,-max_history:]).T
-            train_y = np.copy(leader.Xdots[:,-max_history:].T)
-            # shuffle data??  TODO
-            leader.gp.set_XY(train_x, train_y)
-            leader.gp.resample( n_samples = 50 )
-            if train_gp:
-                if first_time:
-                    leader.gp.train(max_iters=gp_training_iter_init, n_samples = 50, print_status = print_status)
-                    first_time = False
-                else:
-                    leader.gp.train(max_iters=10, n_samples = 50, print_status = print_status)
+#             # Train GP
+#             # train_x = np.append( np.copy(follower.Xs[:,-max_history:].T), np.copy(leader.Xs[:,-max_history:].T) , axis = 1  )
+#             train_x = np.copy(leader.Xs[:,-max_history:]).T
+#             train_y = np.copy(leader.Xdots[:,-max_history:].T)
+#             # shuffle data??  TODO
+#             leader.gp.set_XY(train_x, train_y)
+#             leader.gp.resample( n_samples = 50 )
+#             if train_gp:
+#                 if first_time:
+#                     leader.gp.train(max_iters=gp_training_iter_init, n_samples = 50, print_status = print_status)
+#                     first_time = False
+#                 else:
+#                     leader.gp.train(max_iters=10, n_samples = 50, print_status = print_status)
 
-            leader.gp.resample_obs( n_samples = 50 )
-            leader.gp.get_obs_covariance()
-            leader.gp.initialize_torch()
+#             leader.gp.resample_obs( n_samples = 50 )
+#             leader.gp.get_obs_covariance()
+#             leader.gp.initialize_torch()
             
-            # true_x_adapt.append(uL)
-            # true_y_adapt.append(vL)
-            # mu, cov = leader.gp.predict( leader.X.T )
-            # gp_pred_x_adapt.append( mu[0,0] )
-            # gp_pred_y_adapt.append( mu[0,1] )
-            # gp_pred_x_cov_adapt.append( np.sqrt(cov[0,0]) )
-            # gp_pred_y_cov_adapt.append( np.sqrt(cov[1,1]) )
+#             # true_x_adapt.append(uL)
+#             # true_y_adapt.append(vL)
+#             # mu, cov = leader.gp.predict( leader.X.T )
+#             # gp_pred_x_adapt.append( mu[0,0] )
+#             # gp_pred_y_adapt.append( mu[0,1] )
+#             # gp_pred_x_cov_adapt.append( np.sqrt(cov[0,0]) )
+#             # gp_pred_y_cov_adapt.append( np.sqrt(cov[1,1]) )
             
-            # t0 = time.time()
-            reward = get_future_reward( follower_noise, leader, num_sigma_points = 1, t = t)
-            # print(f"Forward time: {time.time()-t0}")
+#             # t0 = time.time()
+#             reward = get_future_reward( follower_noise, leader, num_sigma_points = 1, t = t, noise = torch.tensor(noise))
+#             # print(f"Forward time: {time.time()-t0}")
 
-            # t0 = time.time()
-            reward.backward(retain_graph=True)
-            # print(f"Backward time: {time.time()-t0}")
-            # Get grads
-            alpha_grad = getGrad( follower_noise.alpha_torch )
-            alpha_grad = np.clip( alpha_grad, -0.1, 0.1 )
+#             # t0 = time.time()
+#             reward.backward(retain_graph=True)
+#             # print(f"Backward time: {time.time()-t0}")
+#             # Get grads
+#             alpha_grad = getGrad( follower_noise.alpha_torch )
+#             alpha_grad = np.clip( alpha_grad, -0.1, 0.1 )
                     
-            k_grad = getGrad( follower_noise.k_torch )
-            k_grad = np.clip( k_grad, -0.1, 0.1 )
+#             k_grad = getGrad( follower_noise.k_torch )
+#             k_grad = np.clip( k_grad, -0.1, 0.1 )
             
-            # print(f"grads: alpha:{ alpha_grad.T }, k:{ k_grad }")
-            # if abs(alpha_grad)>0.1:
-            #     alpha_grad = np.sign(alpha_grad) * 0.3
-            # print("alpha grad", alpha_grad)
-            follower_noise.alpha = np.clip( follower_noise.alpha - lr_alpha * alpha_grad.reshape(-1,1), 0.0, None )
-            follower_noise.k = follower_noise.k - lr_alpha * k_grad
-            follower_noise.alphas = np.append( follower_noise.alphas, follower_noise.alpha, axis=1 )
-            follower_noise.ks = np.append( follower_noise.ks, follower_noise.k )
-            # print("follower alpha", follower.alpha)
+#             # print(f"grads: alpha:{ alpha_grad.T }, k:{ k_grad }")
+#             # if abs(alpha_grad)>0.1:
+#             #     alpha_grad = np.sign(alpha_grad) * 0.3
+#             # print("alpha grad", alpha_grad)
+#             follower_noise.alpha = np.clip( follower_noise.alpha - lr_alpha * alpha_grad.reshape(-1,1), 0.0, None )
+#             follower_noise.k = follower_noise.k - lr_alpha * k_grad
+#             follower_noise.alphas = np.append( follower_noise.alphas, follower_noise.alpha, axis=1 )
+#             follower_noise.ks = np.append( follower_noise.ks, follower_noise.k )
+#             # print("follower alpha", follower.alpha)
             
-            # exit()
+#             # exit()
             
-        fig.canvas.draw()
-        fig.canvas.flush_events()
-        writer.grab_frame()
+#         fig.canvas.draw()
+#         fig.canvas.flush_events()
+#         writer.grab_frame()
   
 plt.ioff()
 
