@@ -240,7 +240,7 @@ plt.ion()
 
 ## Without noise: perfect knowledge??
 
-noise  = 0.0
+noise  = 0.5
 
 metadata = dict(title='Movie Adapt 0', artist='Matplotlib',comment='Movie support!')
 writer = FFMpegWriter(fps=15, metadata=metadata)

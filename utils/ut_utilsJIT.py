@@ -71,6 +71,7 @@ traced_predict_function_jit = torch.jit.trace( predict_function_jit, ( torch.ten
 
 def get_ut_cov_root(cov):
     k = 2
+    n = cov.shape[0]
     if torch.linalg.det( cov )< 0.01:
         root_term = cov
     else:
