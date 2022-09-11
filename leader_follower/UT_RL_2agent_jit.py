@@ -12,7 +12,7 @@ from robot_models.Unicycle import *
 from robot_models.UnicycleJIT import *
 
 from utils.utils import *
-from utils.ut_utilsJIT import *
+from ut_utils.ut_utilsJIT import *
 from utils.mvgp import *
 
 torch.autograd.set_detect_anomaly(True)
@@ -139,32 +139,42 @@ def get_future_reward( follower, leader, t = 0, noise = torch.tensor(0) ):
     
     for i in range(start_t,H):       
         
+        # t0 = time.time()
         leader_xdot_states, leader_xdot_weights = traced_sigma_point_expand_JIT( follower_states[i], leader_states[i], leader_weights[i], torch.tensor(tp), noise )
-        #print(f"Time 1: {time.time()-t0}")
+        # print(f"Time 1: {time.time()-t0}")
         
+        # t0 = time.time()
         leader_states_expanded, leader_weights_expanded = traced_sigma_point_scale_up5_JIT( leader_states[i], leader_weights[i])#leader_xdot_weights )
-        # print(f"time:{tp}, leader_states_expanded:{leader_states_expanded}")
+        # print(f"Time 2: {time.time()-t0}")
+        
         # t0 = time.time()
         A, B = traced_unicycle_SI2D_UT_Mean_Evaluator( follower_states[i], leader_states_expanded, leader_xdot_states, leader_weights_expanded, follower.k_torch, follower.alpha_torch )
         # print(f"Time 3: {time.time()-t0}")    
               
-        leader_mean_position = traced_get_mean_JIT( leader_states[i], leader_weights[i] )        
+        # t0 = time.time()
+        leader_mean_position = traced_get_mean_JIT( leader_states[i], leader_weights[i] )  
+        # print(f"Time 4: {time.time()-t0}")
+              
         # print(f"leader_mean:{leader_mean_position.T}, follower:{ follower_states[-1].T }")
         u_ref = traced_unicycle_nominal_input_tensor_jit( follower_states[i], leader_mean_position )
         
+        # t0 = time.time()
         solution,  = cbf_controller_layer( u_ref, A, B )
         # print("solution", solution)
-        #print(f"Time 6: {time.time()-t0}")
+        # print(f"Time 5: {time.time()-t0}")
         
         follower_states.append( follower.step_torch( follower_states[i], solution, dt_outer ) )        
         leader_next_state_expanded = leader_states_expanded + leader_xdot_states * dt_outer
         
-        #t0 = time.time()
+        # t0 = time.time()
         leader_next_states, leader_next_weights = traced_sigma_point_compress_JIT( leader_next_state_expanded, leader_xdot_weights )        
+        # print(f"Time 6: {time.time()-t0}")
         leader_states.append( leader_next_states ); leader_weights.append( leader_next_weights )
         
         # Get reward for this state and control input choice = Expected reward in general settings
+        # t0 = time.time()
         reward = reward + traced_unicycle_reward_UT_Mean_Evaluator_basic( follower_states[i+1], leader_states[i+1], leader_weights[i+1])
+        # print(f"Time 7: {time.time()-t0}")
         
         tp = tp + dt_outer
 

@@ -17,7 +17,7 @@ from gym.error import DependencyNotInstalled
 # from gym_recording.wrappers import TraceRecordingWrapper
 # from gym.wrappers.record_video import RecordVideo
 from gym_wrappers.record_video import RecordVideo
-
+  
 class CustomCartPoleEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
     """
     ### Description
@@ -111,13 +111,24 @@ class CustomCartPoleEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         self.state = None
 
         self.steps_beyond_terminated = None
+        
+        # tensors
+        self.X_torch = []
+        self.param_w = []
+        self.param_mu = []
+        self.param_Sigma = []
+        
+    def get_state(self):
+        x, x_dot, theta, theta_dot = self.state
+        return np.array([x, x_dot, theta, theta_dot]).reshape(-1,1)
 
     def step(self, action):
-        err_msg = f"{action!r} ({type(action)}) invalid"
-        assert self.action_space.contains(action), err_msg
+        # err_msg = f"{action!r} ({type(action)}) invalid"
+        # assert self.action_space.contains(action), err_msg
         assert self.state is not None, "Call reset before using step method."
         x, x_dot, theta, theta_dot = self.state
-        force = self.force_mag if action == 1 else -self.force_mag
+        # force = self.force_mag if action == 1 else -self.force_mag
+        force = action
         costheta = math.cos(theta)
         sintheta = math.sin(theta)
 

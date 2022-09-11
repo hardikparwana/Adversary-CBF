@@ -13,7 +13,7 @@ import gpytorch
 from robot_models.SingleIntegrator2D import *
 from robot_models.Unicycle import *
 from utils.utils import *
-from utils.ut_utils import *
+from ut_utils.ut_utils import *
 from utils.mvgp import *
 
 torch.autograd.set_detect_anomaly(True)

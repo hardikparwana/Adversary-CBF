@@ -190,19 +190,19 @@ class MVGP:
         
         return mean.reshape(1,-1), cov
     
-    # def predict_torch(self, Xnew):
-    #     N = self.N_data
+    def predict_torch(self, Xnew):
+        N = self.N_data
         
-    #     k_star = self.get_X_cov_torch(Xnew)
-    #     mean =  (self.K_inv_torch @ k_star).T @ self.Y_obs_torch
+        k_star = self.get_X_cov_torch(Xnew)
+        mean =  (self.K_inv_torch @ k_star).T @ self.Y_obs_torch
         
-    #     # print("**************** called *****************")
-    #     Sigma = self.evaluate_kernel_torch(Xnew, Xnew) + self.noise - (self.K_inv_torch @ k_star).T @ torch.clone(k_star)
-    #     cov = torch.kron(Sigma, self.omega_torch)
+        # print("**************** called *****************")
+        Sigma = self.evaluate_kernel_torch(Xnew, Xnew) + self.noise - (self.K_inv_torch @ k_star).T @ torch.clone(k_star)
+        cov = torch.kron(Sigma, self.omega_torch)
         
-    #     # mean = torch.tensor([[1,1]], dtype=torch.float)
-    #     # cov = torch.zeros((2,2), dtype=torch.float)
-    #     return mean, cov
+        # mean = torch.tensor([[1,1]], dtype=torch.float)
+        # cov = torch.zeros((2,2), dtype=torch.float)
+        return mean, cov
     
 
     
@@ -472,5 +472,6 @@ class MVGP:
             #         print("Error in setting variable to update.")
 
             # Save parameters and likelihoods
-            if (iters % 10 == 0) and print_status:
+            print(f"sigma:{self.sigma}, l:{self.l}")
+            if (iters % 1 == 0) and print_status:
                 print(f"Iteration: {iters}, Likelihood for this dataset: {L}, grads: {dL_dl}, {dL_ds}, {dL_domega}, {dL_dL}, {dL_dp}")
