@@ -23,7 +23,7 @@ min_dist = 1.0 # 0.1#0.05  # less than this and dercrease alpha
 cbf_extra_bad = 0.0
 update_param = True
 
-alpha_cbf = 0.8
+alpha_cbf = 0.7#1.4#0.8
 alpha_der_max = 0.5#1.0#0.5
 
 # Plot                  
@@ -38,7 +38,7 @@ ax.set_ylabel("Y")
 num_adversaries = 3
 alpha = 0.1
 
-default_plot = False
+default_plot = True
 save_plot = False
 movie_name = 'test0_default.mp4'
 
@@ -96,6 +96,17 @@ const1 = [A1 @ u1 <= b1]
 objective1 = cp.Minimize( cp.sum_squares( u1 - u1_ref  ) )
 cbf_controller = cp.Problem( objective1, const1 )
 
+##########3: relaxed CBF controller
+u1_relaxed = cp.Variable((2,1))
+u1_ref_relaxed = cp.Parameter((2,1),value = np.zeros((2,1)) )
+num_constraints1_relaxed  = num_robots - 1 + num_adversaries
+A1_relaxed = cp.Parameter((num_constraints1_relaxed,2),value=np.zeros((num_constraints1_relaxed,2)))
+b1_relaxed = cp.Parameter((num_constraints1_relaxed,1),value=np.zeros((num_constraints1_relaxed,1)))
+delta_relaxed = cp.Variable((num_constraints1_relaxed,1))
+const1_relaxed = [A1_relaxed @ u1_relaxed <= b1_relaxed + delta_relaxed]
+objective1_relaxed = cp.Minimize( 10000 * cp.sum_squares( u1_relaxed - u1_ref_relaxed  ) + 10 * cp.sum_squares( delta_relaxed ) )
+cbf_controller_relaxed = cp.Problem( objective1_relaxed, const1_relaxed )
+
 
 ###### 2: Best case controller
 u2 = cp.Variable( (2,1) )
@@ -105,8 +116,6 @@ num_constraints2 = num_robots - 1 + num_adversaries
 A2 = cp.Parameter((num_constraints2,2),value=np.zeros((num_constraints2,2)))
 b2 = cp.Parameter((num_constraints2,1),value=np.zeros((num_constraints2,1)))
 const2 = [A2 @ u2 <= b2]
-# const2 += [cp.abs(u2[0,0])<=10.0]
-# const2 += [cp.abs(u2[1,0])<=40.0]
 objective2 = cp.Minimize( Q2 @ u2 )
 best_controller = cp.Problem( objective2, const2 )
 
@@ -292,8 +301,8 @@ with writer.saving(fig, movie_name, 100):
                     b = -robots[j].adv_alpha[0,k] * h  - dh_dxj @ ( robots[j].f() + robots[j].g() @ u2.value ) - dh_dxk @ greedy[k].f() #- dh_dxi @ robots[j].U
                     
                     robots[j].trust_adv[0,k] = compute_trust( A, b, greedy[k].f() + greedy[k].g() @ greedy[k].U, u_greedy_nominal, h, min_dist, h_min )  
-                    if robots[j].trust_adv[0,k]<0:
-                        print(f"{j}'s Trust of {k} adversary: {best_controller.status}: {robots[j].trust_adv[0,k]}, h:{h} ")    
+                    # if robots[j].trust_adv[0,k]<0:
+                    #     print(f"{j}'s Trust of {k} adversary: {best_controller.status}: {robots[j].trust_adv[0,k]}, h:{h} ")    
                     robots[j].adv_alpha[0,k] = robots[j].adv_alpha[0,k] + alpha_der_max * robots[j].trust_adv[0,k]
                     if (robots[j].adv_alpha[0,k]<0):
                         robots[j].adv_alpha[0,k] = 0.01
@@ -315,8 +324,8 @@ with writer.saving(fig, movie_name, 100):
                     b = -robots[j].robot_alpha[0,k] * h - dh_dxi @ ( robots[j].f() + robots[j].g() @  u2.value) #- dh_dxi @ robots[j].U  # need best case U here. not previous U
                     
                     robots[j].trust_robot[0,k] = compute_trust( A, b, robots[k].f() + robots[k].g() @ robots[k].U, robots[k].x_dot_nominal, h, min_dist, h_min )            
-                    if robots[j].trust_robot[0,k]<0:
-                        print(f"{j}'s Trust of {k} robot: {best_controller.status}: {robots[j].trust_robot[0,k]}, h:{h}")
+                    # if robots[j].trust_robot[0,k]<0:
+                    #     print(f"{j}'s Trust of {k} robot: {best_controller.status}: {robots[j].trust_robot[0,k]}, h:{h}")
                     robots[j].robot_alpha[0,k] = robots[j].robot_alpha[0,k] + alpha_der_max * robots[j].trust_robot[0,k]
                     if (robots[j].robot_alpha[0,k]<0):
                         robots[j].robot_alpha[0,k] = 0.01
@@ -337,7 +346,7 @@ with writer.saving(fig, movie_name, 100):
             robots[j].nextU = u1.value       
             
             
-            ## Default
+            ## Default  #########################################################################################
             
             # Constraints in LP and QP are same      
             A1.value = robots_default[j].A1
@@ -353,10 +362,24 @@ with writer.saving(fig, movie_name, 100):
             robots_default[j].adv_hs = np.append( robots_default[j].adv_hs, robots_default[j].adv_h, axis=0 )
             
             u1_ref.value = robots_default[j].U_ref
-            cbf_controller.solve(solver=cp.GUROBI)
+            cbf_controller.solve(solver=cp.GUROBI) 
             if cbf_controller.status!='optimal':
                 print(f"{j}'s input: {cbf_controller.status}")
-            robots_default[j].nextU = u1.value     
+                # robots_default[j].nextU = robots_default[j].U_ref # TODO: take care of this
+                # A1_relaxed.value = A1.value
+                # b1_relaxed.value = b1.value
+                # u1_ref_relaxed.value = u1_ref.value
+                # cbf_controller_relaxed.solve(solver=cp.GUROBI)
+                # robots_default[j].nextU = u1_relaxed.value    
+                # if cbf_controller_relaxed.status!='optimal':
+                #     print(f"{j}'s input: {cbf_controller.status}")
+                #     exit()
+                # else:
+                #     print("USED relaxed Controller!!!!") # use the last solved value
+            else:
+                robots_default[j].nextU = u1.value   # use the last solved value
+                
+            #######################################################################################################
             
         for j in range(num_adversaries):
             greedy[j].step(greedy[j].U_ref)    
@@ -366,7 +389,7 @@ with writer.saving(fig, movie_name, 100):
         for j in range(num_robots):
             robots[j].step( robots[j].nextU )
             robots[j].render_plot()
-            print(f"{j} state: {robots[j].X[1,0]}, input:{robots[j].nextU[0,0]}, {robots[j].nextU[1,0]}")
+            # print(f"{j} state: {robots[j].X[1,0]}, input:{robots[j].nextU[0,0]}, {robots[j].nextU[1,0]}")
             
             robots_default[j].step( robots_default[j].nextU )
             robots_default[j].render_plot()

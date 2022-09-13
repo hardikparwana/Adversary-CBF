@@ -151,9 +151,11 @@ class Unicycle:
         dh_dxi = np.append( -2*( self.X[0:2] - agent.X[0:2] ).T - der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) ),  - der_sigma * ( np.cos(theta)*( self.X[0,0]-agent.X[0,0] ) - np.sin(theta)*( self.X[1,0] - agent.X[1,0] ) ) , axis=1)
         
         if agent.type=='SingleIntegrator2D':
-            dh_dxj = 2*( self.X[0:2] - agent.X[0:2] ).T
+            # dh_dxj = 2*( self.X[0:2] - agent.X[0:2] ).T
+            dh_dxj = 2*( self.X[0:2] - agent.X[0:2] ).T + der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) )
         elif agent.type=='Unicycle':
-            dh_dxj = np.append( -2*( self.X[0:2] - agent.X[0:2] ).T + der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) ), np.array([[0]]), axis=1 )
+            # dh_dxj = np.append( -2*( self.X[0:2] - agent.X[0:2] ).T + der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) ), np.array([[0]]), axis=1 )
+            dh_dxj = np.append( 2*( self.X[0:2] - agent.X[0:2] ).T + der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) ), np.array([[0]]), axis=1 )
         else:
             dh_dxj = 2*( self.X[0:2] - agent.X[0:2] ).T
         
