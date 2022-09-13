@@ -103,7 +103,7 @@ def get_future_reward( follower, leader, t = 0, noise = torch.tensor(0) ):
         leader_xdot_states, leader_xdot_weights = sigma_point_expand_JIT( follower_states[i], leader_states[i], leader_weights[i], torch.tensor(tp), noise )       
         
         traced_sigma_point_scale_up5_JIT = torch.jit.trace( sigma_point_scale_up5_JIT, ( leader_states[i], leader_weights[i] ) )
-        leader_states_expanded, leader_weights_expanded = sigma_point_scale_up5_JIT( leader_states[i], leader_weights[i] )#leader_xdot_weights )
+        leader_states_expanded, leader_weights_expanded = traced_sigma_point_scale_up5_JIT( leader_states[i], leader_weights[i] )#leader_xdot_weights )
         
         traced_unicycle_SI2D_UT_Mean_Evaluator = torch.jit.trace(unicycle_SI2D_UT_Mean_Evaluator, (follower_states[i], leader_states_expanded, leader_xdot_states, leader_weights_expanded, follower.k_torch, follower.alpha_torch))
         A, B = traced_unicycle_SI2D_UT_Mean_Evaluator( follower_states[i], leader_states_expanded, leader_xdot_states, leader_weights_expanded, follower.k_torch, follower.alpha_torch )

@@ -12,6 +12,7 @@ import gym
 from gym import logger, spaces
 from gym.envs.classic_control import utils
 from gym.error import DependencyNotInstalled
+import torch
 
 # For recording
 # from gym_recording.wrappers import TraceRecordingWrapper
@@ -183,6 +184,42 @@ class CustomCartPoleEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         if self.render_mode == "human":
             self.render()
         return np.array(self.state, dtype=np.float32), reward, terminated, False, {}
+
+    def step_torch(self, X, action):
+            # err_msg = f"{action!r} ({type(action)}) invalid"
+        # assert self.action_space.contains(action), err_msg
+        assert self.state is not None, "Call reset before using step method."
+        x, x_dot, theta, theta_dot = X[0,0], X[1,0], X[2,0], X[3,0]
+        # force = self.force_mag if action == 1 else -self.force_mag
+        force = action
+        costheta = math.cos(theta)
+        sintheta = math.sin(theta)
+
+        # For the interested reader:
+        # https://coneural.org/florian/papers/05_cart_pole.pdf
+        temp = (
+            force + self.polemass_length * torch.square(theta_dot) * sintheta
+        ) / self.total_mass
+        thetaacc = (self.gravity * sintheta - costheta * temp) / (
+            self.length * (4.0 / 3.0 - self.masspole * torch.square(costheta) / self.total_mass)
+        )
+        xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
+
+        if self.kinematics_integrator == "euler":
+            x = x + self.tau * x_dot
+            x_dot = x_dot + self.tau * xacc
+            theta = theta + self.tau * theta_dot
+            theta_dot = theta_dot + self.tau * thetaacc
+        else:  # semi-implicit euler
+            x_dot = x_dot + self.tau * xacc
+            x = x + self.tau * x_dot
+            theta_dot = theta_dot + self.tau * thetaacc
+            theta = theta + self.tau * theta_dot
+            
+        X_next = torch.cat( ( x.reshape(-1,1), x_dot.reshape(-1,1), theta.reshape(-1,1), theta_dot.reshape(-1,1) ), dim = 0 )
+
+        return np.array(self.state, dtype=np.float32), reward, terminated, False, {}
+
 
     def reset(
         self,

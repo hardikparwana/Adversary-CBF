@@ -5,8 +5,8 @@ from utils.sqrtm import sqrtm
 from utils.identity_map import identity
 from robot_models.UnicycleJIT import *
 from inliner import inline
-from numba import njit
-from numba import jit
+
+from utils.mvgp_jit import traced_predict_torch_jit
 
 # @torch.jit.script
 def get_mean_cov_JIT(sigma_points, weights):
@@ -230,8 +230,8 @@ def unicycle_SI2D_UT_Mean_Evaluator(  robotJ_state, robotK_sigma_points, robotK_
 # @torch.jit.script
 def unicycle_reward_UT_Mean_Evaluator_basic(robotJ_state, robotK_sigma_points, robotK_weights):
     mu = unicycle_compute_reward_jit( robotJ_state, robotK_sigma_points[:,0].reshape(-1,1)  ) *  robotK_weights[0,0]
-    for i in range(robotK_sigma_points.shape[1]):
-        mu = unicycle_compute_reward_jit( robotJ_state, robotK_sigma_points[:,i].reshape(-1,1)  ) *  robotK_weights[0,i]
+    for i in range(1, robotK_sigma_points.shape[1]):
+        mu = mu + unicycle_compute_reward_jit( robotJ_state, robotK_sigma_points[:,i].reshape(-1,1)  ) *  robotK_weights[0,i]
     return mu
 
 
