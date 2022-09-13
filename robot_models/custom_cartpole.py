@@ -119,6 +119,14 @@ class CustomCartPoleEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         self.param_mu = []
         self.param_Sigma = []
         
+    def clip_theta(self,theta):
+        if theta>np.pi:
+            theta = theta - 2 * np.pi
+        elif theta<-np.pi :
+            theta = theta + 2 * np.pi
+        return theta
+            
+        
     def get_state(self):
         x, x_dot, theta, theta_dot = self.state
         return np.array([x, x_dot, theta, theta_dot]).reshape(-1,1)
@@ -146,15 +154,25 @@ class CustomCartPoleEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         if self.kinematics_integrator == "euler":
             x = x + self.tau * x_dot
             x_dot = x_dot + self.tau * xacc
-            theta = theta + self.tau * theta_dot
+            theta = self.clip_theta(theta + self.tau * theta_dot)
             theta_dot = theta_dot + self.tau * thetaacc
         else:  # semi-implicit euler
             x_dot = x_dot + self.tau * xacc
             x = x + self.tau * x_dot
             theta_dot = theta_dot + self.tau * thetaacc
-            theta = theta + self.tau * theta_dot
+            theta = self.clip_theta(theta + self.tau * theta_dot)
+            
+        if x > 1.8:
+            x = 0.0
+        elif x < -1.8:
+            x = 0.0
+            
+        # print(f"pos: {x}, theta:{theta}")
 
         self.state = (x, x_dot, theta, theta_dot)
+
+        
+        
 
         # terminated = bool(
         #     x < -self.x_threshold
@@ -208,17 +226,17 @@ class CustomCartPoleEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         if self.kinematics_integrator == "euler":
             x = x + self.tau * x_dot
             x_dot = x_dot + self.tau * xacc
-            theta = theta + self.tau * theta_dot
+            theta = self.clip_theta(theta + self.tau * theta_dot)
             theta_dot = theta_dot + self.tau * thetaacc
         else:  # semi-implicit euler
             x_dot = x_dot + self.tau * xacc
             x = x + self.tau * x_dot
             theta_dot = theta_dot + self.tau * thetaacc
-            theta = theta + self.tau * theta_dot
+            theta = self.clip_theta(theta + self.tau * theta_dot)
             
         X_next = torch.cat( ( x.reshape(-1,1), x_dot.reshape(-1,1), theta.reshape(-1,1), theta_dot.reshape(-1,1) ), dim = 0 )
 
-        return np.array(self.state, dtype=np.float32), reward, terminated, False, {}
+        return np.array(self.state, dtype=np.float32)
 
 
     def reset(
@@ -337,7 +355,36 @@ class CustomCartPoleEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
             pygame.quit()
             self.isopen = False
 
+def get_state_dot_torch(X, action, polemass_length, gravity, length, masspole, total_mass, tau):
+        
+        x, x_dot, theta, theta_dot = X[0,0], X[1,0], X[2,0], X[3,0]
+        # force = self.force_mag if action == 1 else -self.force_mag
+        force = action
+        costheta = torch.cos(theta)
+        sintheta = torch.sin(theta)
 
+        # For the interested reader:
+        # https://coneural.org/florian/papers/05_cart_pole.pdf
+        temp = (
+            force + polemass_length * torch.square(theta_dot) * sintheta
+        ) / total_mass
+        thetaacc = (gravity * sintheta - costheta * temp) / (
+            length * (4.0 / 3.0 - masspole * torch.square(costheta) / total_mass)
+        )
+        xacc = temp - polemass_length * thetaacc * costheta / total_mass
+
+        X_dot = torch.cat( ( x_dot.reshape(-1,1), xacc.reshape(-1,1), theta_dot.reshape(-1,1), thetaacc.reshape(-1,1) ), dim = 0 )
+
+        return X_dot 
+    
+def get_state_dot_noisy_torch(X, action, polemass_length, gravity, length, masspole, total_mass, tau):
+    X_dot = get_state_dot_torch(X, action, polemass_length, gravity, length, masspole, total_mass, tau)
+    error_square = torch.square(X_dot/4)
+    cov = torch.diag( error_square[:,0] )
+    # cov = torch.zeros((4,4))
+    return X_dot, cov
+    
+    
 env_to_render = CustomCartPoleEnv(render_mode="rgb_array")
 # env = TraceRecordingWrapper(env)
 # env = gym.wrappers.Monitor(env, "recording",force=True)

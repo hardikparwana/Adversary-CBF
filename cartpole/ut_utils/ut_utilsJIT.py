@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from utils.sqrtm import sqrtm
 from utils.mvgp_jit import *
+from robot_models.custom_cartpole import get_state_dot_noisy_torch
 
 def get_mean_JIT(sigma_points, weights):
     weighted_points = sigma_points * weights[0]
@@ -36,7 +37,25 @@ def get_ut_cov_root_diagonal(cov):
     k = -1
     n = cov.shape[0]
     
-    root_term = torch.sqrt( (n+k)*cov )
+    cov_abs = torch.abs(cov)
+    if cov_abs[0,0]>0.01:
+        root0 = torch.sqrt(cov[0,0])
+    else:
+        root0 = torch.tensor(0, dtype=torch.float)
+    if cov_abs[1,1]>0.01:
+        root1 = torch.sqrt(cov[1,1])
+    else:
+        root1 = torch.tensor(0, dtype=torch.float)
+    if cov_abs[2,2]>0.01:
+        root2 = torch.sqrt(cov[2,2])
+    else:
+        root2 = torch.tensor(0, dtype=torch.float)
+    if cov_abs[3,3]>0.01:
+        root3 = torch.sqrt(cov[2,2])
+    else:
+        root3 = torch.tensor(0, dtype=torch.float)
+    
+    root_term = torch.diag( (n+k) * torch.cat( ( root0.reshape(-1,1), root1.reshape(-1,1), root2.reshape(-1,1), root3.reshape(-1,1) ), dim = 1 )[0] )
 
     return root_term
 
@@ -74,21 +93,23 @@ def generate_sigma_points_JIT( mu, cov_root, base_term, factor ):
 
 mu_t = torch.ones((4,1)).reshape(-1,1)
 cov_t = torch.tensor([ [ 1.0, 0.0, 0.0, 0.0 ], [0.0, 3.0, 0.0, 0.0], [0.0, 0.0, 4.0, 0.0], [0.0, 0.0, 0.0, 1.5] ])
-traced_generate_sigma_points_JIT = torch.jit.trace( generate_sigma_points_JIT, ( mu_t, cov_t, torch.ones((4,1)), torch.tensor(1.0) ) )
+traced_generate_sigma_points_JIT = generate_sigma_points_JIT #torch.jit.trace( generate_sigma_points_JIT, ( mu_t, cov_t, torch.ones((4,1)), torch.tensor(1.0) ) )
 
-def sigma_point_expand_JIT(GA, PE, gp_params, K_invs, noise, X_s, Y_s, sigma_points, weights, control, dt_outer, dt_inner):#, gps):
+def sigma_point_expand_JIT(GA, PE, gp_params, K_invs, noise, X_s, Y_s, sigma_points, weights, control, dt_outer, dt_inner, polemass_length, gravity, length, masspole, total_mass, tau):#, gps):
    
     n, N = sigma_points.shape   
-    sys_state = torch.cat( (sigma_points[:,0].reshape(1,-1), control.reshape(1,-1)), 1 )    
+    # sys_state = torch.cat( (sigma_points[:,0].reshape(1,-1), control.reshape(1,-1)), 1 )    
 
     # GP prediction###############################################################
-    L = torch.tensor(1.0); p = torch.tensor(1.0); omega = torch.tensor([[1.0]])
-    mu1, cov1 = traced_predict_torch_jit(GA, PE, gp_params[0,0], gp_params[0,1:], L, p, omega, sys_state, K_invs[:,:,0], X_s, Y_s[:,0], noise)
-    mu2, cov2 = traced_predict_torch_jit(GA, PE, gp_params[1,0], gp_params[1,1:], L, p, omega, sys_state, K_invs[:,:,1], X_s, Y_s[:,1], noise)
-    mu3, cov3 = traced_predict_torch_jit(GA, PE, gp_params[2,0], gp_params[2,1:], L, p, omega, sys_state, K_invs[:,:,2], X_s, Y_s[:,2], noise)
-    mu4, cov4 = traced_predict_torch_jit(GA, PE, gp_params[3,0], gp_params[3,1:], L, p, omega, sys_state, K_invs[:,:,3], X_s, Y_s[:,3], noise)
-    mu = torch.cat( (mu1, mu2, mu3, mu4), dim = 0 ).reshape(-1,1)
-    cov = torch.diag( torch.cat((cov1, cov2, cov3, cov4), dim = 1)[0] )
+    # L = torch.tensor(1.0); p = torch.tensor(1.0); omega = torch.tensor([[1.0]])
+    # mu1, cov1 = traced_predict_torch_jit(GA, PE, gp_params[0,0], gp_params[0,1:], L, p, omega, sys_state, K_invs[:,:,0], X_s, Y_s[:,0], noise)
+    # mu2, cov2 = traced_predict_torch_jit(GA, PE, gp_params[1,0], gp_params[1,1:], L, p, omega, sys_state, K_invs[:,:,1], X_s, Y_s[:,1], noise)
+    # mu3, cov3 = traced_predict_torch_jit(GA, PE, gp_params[2,0], gp_params[2,1:], L, p, omega, sys_state, K_invs[:,:,2], X_s, Y_s[:,2], noise)
+    # mu4, cov4 = traced_predict_torch_jit(GA, PE, gp_params[3,0], gp_params[3,1:], L, p, omega, sys_state, K_invs[:,:,3], X_s, Y_s[:,3], noise)
+    # mu = torch.cat( (mu1, mu2, mu3, mu4), dim = 0 ).reshape(-1,1)
+    # cov = torch.diag( torch.cat((cov1, cov2, cov3, cov4), dim = 1)[0] )
+    
+    mu, cov = get_state_dot_noisy_torch(sigma_points[:,0].reshape(-1,1), control.reshape(-1,1), polemass_length, gravity, length, masspole, total_mass, tau)
     
     # mu1, std1 = gps[0].predict( sys_state.detach().numpy()  , return_std=True )
     # mu2, std2 = gps[1].predict( sys_state.detach().numpy()  , return_std=True )
@@ -103,15 +124,15 @@ def sigma_point_expand_JIT(GA, PE, gp_params, K_invs, noise, X_s, Y_s, sigma_poi
         
     for i in range(1,N):
         
-        sys_state = torch.cat( (sigma_points[:,i].reshape(1,-1), control.reshape(1,-1)), 1 )   
+        # sys_state = torch.cat( (sigma_points[:,i].reshape(1,-1), control.reshape(1,-1)), 1 )   
         
         # GP prediction###############################################################
-        mu1, cov1 = traced_predict_torch_jit(torch.tensor(1.0), torch.tensor(0.0), gp_params[0,0], gp_params[0,1], L, p, omega, sys_state, K_invs[:,:,0], X_s, Y_s[:,0], noise)
-        mu2, cov2 = traced_predict_torch_jit(torch.tensor(1.0), torch.tensor(0.0), gp_params[1,0], gp_params[1,1], L, p, omega, sys_state, K_invs[:,:,1], X_s, Y_s[:,1], noise)
-        mu3, cov3 = traced_predict_torch_jit(torch.tensor(1.0), torch.tensor(0.0), gp_params[2,0], gp_params[2,1], L, p, omega, sys_state, K_invs[:,:,2], X_s, Y_s[:,2], noise)
-        mu4, cov4 = traced_predict_torch_jit(torch.tensor(1.0), torch.tensor(0.0), gp_params[3,0], gp_params[3,1], L, p, omega, sys_state, K_invs[:,:,3], X_s, Y_s[:,3], noise)
-        mu = torch.cat( (mu1, mu2, mu3, mu4), dim = 0 ).reshape(-1,1)
-        cov = torch.diag( torch.cat((cov1, cov2, cov3, cov4), dim = 1)[0] )
+        # mu1, cov1 = traced_predict_torch_jit(torch.tensor(1.0), torch.tensor(0.0), gp_params[0,0], gp_params[0,1], L, p, omega, sys_state, K_invs[:,:,0], X_s, Y_s[:,0], noise)
+        # mu2, cov2 = traced_predict_torch_jit(torch.tensor(1.0), torch.tensor(0.0), gp_params[1,0], gp_params[1,1], L, p, omega, sys_state, K_invs[:,:,1], X_s, Y_s[:,1], noise)
+        # mu3, cov3 = traced_predict_torch_jit(torch.tensor(1.0), torch.tensor(0.0), gp_params[2,0], gp_params[2,1], L, p, omega, sys_state, K_invs[:,:,2], X_s, Y_s[:,2], noise)
+        # mu4, cov4 = traced_predict_torch_jit(torch.tensor(1.0), torch.tensor(0.0), gp_params[3,0], gp_params[3,1], L, p, omega, sys_state, K_invs[:,:,3], X_s, Y_s[:,3], noise)
+        # mu = torch.cat( (mu1, mu2, mu3, mu4), dim = 0 ).reshape(-1,1)
+        # cov = torch.diag( torch.cat((cov1, cov2, cov3, cov4), dim = 1)[0] )
         ###############################################################################
 
         root_term = get_ut_cov_root_diagonal(cov)           
@@ -136,4 +157,4 @@ def reward_UT_Mean_Evaluator_basic(sigma_points, weights):
 
 def compute_reward_jit( state ):
     theta = state[2,0] # want theta and theta_dot to be 0
-    return -torch.cos(theta)
+    return - 100 * torch.cos(theta)

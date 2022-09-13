@@ -9,10 +9,18 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel, ConstantKernel
 
 from numba import jit
-        
+# TODO add something to diff here
 # TODO: square vs constant
+
+def clip_angle_torch(x):
+    if x[2] > torch.tensor(np.pi, dtype=torch.float):
+        x[2] = x[2] - torch.tensor(2 * np.pi, dtype=torch.float)
+    elif x[2] < torch.tensor(-np.pi, dtype=torch.float):
+        x[2] = x[2] + torch.tensor(2 * np.pi, dtype=torch.float)
+    return x
+
 def evaluate_kernel_torch_gaussian_jit(sigma_torch, l_torch, L_torch, p_torch, x1, x2):
-    diff = torch.norm(x1/l_torch - x2/l_torch)
+    diff = torch.norm((x1-x2)/l_torch)
     return sigma_torch * torch.exp(-diff**2 / 2.0 ) # / torch.square(l_torch))
     
 def evaluate_kernel_torch_periodic_jit(sigma_torch, l_torch, L_torch, p_torch, x1, x2):
@@ -31,7 +39,7 @@ def get_X_cov_torch_jit(sigma_torch, l_torch, L_torch, p_torch, X_obs_torch, Xne
         K_star_torch[i,0] = evaluate_kernel_torch_gaussian_jit(sigma_torch, l_torch, L_torch, p_torch, X_obs_torch[i,:], Xnew)
     return K_star_torch
 
-def predict_torch_jit(GA, PE, sigma_torch, l_torch, L_torch, p_torch, omega_torch, Xnew, K_inv_torch, X_obs_torch, Y_obs_torch, noise ):
+def predict_torch_jit(GA, PE, sigma_torch, l_torch, L_torch, p_torch, omega_torch, Xnew, K_inv_torch, X_obs_torch, Y_obs_torch, noise, Kcov ):
     
     k_star = traced_get_X_cov_torch_jit(sigma_torch, l_torch, L_torch, p_torch, X_obs_torch, Xnew)
     mean =  (K_inv_torch @ k_star).T @ Y_obs_torch
@@ -41,15 +49,15 @@ def predict_torch_jit(GA, PE, sigma_torch, l_torch, L_torch, p_torch, omega_torc
     
     # mean = torch.tensor([[1,1]], dtype=torch.float)
     # cov = torch.zeros((2,2), dtype=torch.float)
-    if cov<0:
-        print("ERROR in cov **************************************************", cov)
-        cov = cov + torch.tensor([[0.1]])
-        cov = torch.tensor([[0]])
+    # if cov<0:
+    #     print("ERROR in cov **************************************************", cov)
+    #     cov = cov + torch.tensor([[0.1]])
+    #     cov = torch.tensor([[0]])
     return mean, cov
 
 traced_size = 30
 traced_predict_torch_jit = predict_torch_jit #torch.jit.trace( predict_torch_jit, ( torch.tensor(1.0), torch.tensor(0.0), torch.tensor(2.0), torch.tensor(1.0), torch.tensor(1.0), torch.tensor(1.0), torch.tensor([[1.0]]), torch.ones((1,5)), torch.eye(traced_size),  torch.ones((traced_size,5)) , torch.ones((traced_size,1)), torch.tensor(0.0) ) )
-traced_get_X_cov_torch_jit = torch.jit.trace( get_X_cov_torch_jit, (torch.tensor(2.0), torch.tensor(1.0), torch.tensor(1.0), torch.tensor(1.0), torch.ones((traced_size,5)), torch.ones((1,5))) )
+traced_get_X_cov_torch_jit = get_X_cov_torch_jit #torch.jit.trace( get_X_cov_torch_jit, (torch.tensor(2.0), torch.tensor(1.0), torch.tensor(1.0), torch.tensor(1.0), torch.ones((traced_size,5)), torch.ones((1,5))) )
 
 
 # select a subset for predictions
@@ -65,9 +73,16 @@ def resample_obs_numba( X, Y, n_samples=80, start_index = 0 ):
 def evaluate_kernel_numba(GA, PE, sigma, l, L, p, x1, x2):
     return evaluate_kernel_gaussian_numba( GA, PE, sigma, l, L, p, x1, x2 )
        
+def clip_angle( x ):
+    # if x[2] > np.pi:
+    #     x[2] = x[2] - 2 * np.pi
+    # elif x[2] < -np.pi:
+    #     x[2] = x[2] + 2* np.pi
+    return x       
+
 # @jit(nopython=True) 
 def evaluate_kernel_gaussian_numba(GA, PE, sigma, l, L, p, x1, x2):
-    diff = np.linalg.norm(x1/l - x2/l)
+    diff = np.linalg.norm(clip_angle(x1-x2)/l)
     # print(f"diff:{diff}, return:{ sigma**2 * np.exp(-diff**2 / (2*l**2)) }")
     return GA * sigma * np.exp(-diff**2 / 2.0) #(2 * l**2))
 
@@ -152,7 +167,7 @@ def get_covariance_numba(GA, PE, sigma, l, L, p, omega,  noise, X_s):
             for j in range(i, N):
                 val = evaluate_kernel_numba(GA, PE, sigma, l, L, p, X_s[i,:], X_s[j,:])
                 if (i == j):
-                    K[i, i] = val.item() + noise
+                    K[i, i] = val.item() #+ noise
                 else:
                     K[i, j] = val.item()
                     K[j, i] = val.item()
@@ -162,7 +177,7 @@ def get_covariance_numba(GA, PE, sigma, l, L, p, omega,  noise, X_s):
 def get_covariance_inv_numba( GA, PE, sigma, l, L, p, omega,  noise, X_s ):
     cov = get_covariance_numba(GA, PE, sigma, l, L, p, omega,  noise, X_s)
     cov_inv = np.linalg.inv( cov )
-    return cov_inv
+    return cov, cov_inv
     
 # Get derivative of covariance matrix (w.r.t. length scale and sigma)
 # @jit(nopython=True)

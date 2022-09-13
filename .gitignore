@@ -10,3 +10,4 @@ ctorch/lltm-extension/build/
 robot_models/__pycache__/*
 leader_follower/__pycache__/
 cartpole/__pycache__/*
+*/*.pyc
