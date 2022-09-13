@@ -28,6 +28,8 @@ def policy(param_w, param_mu, param_Sigma, X):
     diff = X - param_mu[:,0].reshape(-1,1)
     # phi = torch.exp( -0.5 * diff.T @ Sigma_inv @ diff )        
     phi = torch.exp( -0.5 * diff.T @ torch.inverse(param_Sigma[:,:,0]) @ diff )     
+    # phi = torch.exp( -0.5 * diff.T @ torch.inverse(torch.diag(param_Sigma)) @ diff )     
+    # phi = torch.exp( -0.5 * diff.T @ torch.inverse(torch.diag(param_Sigma[:,0])) @ diff )   
     pi = param_w[0] * phi
     
     # Remaining basis functions
@@ -35,6 +37,8 @@ def policy(param_w, param_mu, param_Sigma, X):
         diff = X - param_mu[:,i].reshape(-1,1)
         # phi = torch.exp( -0.5 * diff.T @ Sigma_inv @ diff )
         phi = torch.exp( -0.5 * diff.T @ torch.inverse(param_Sigma[:,:,i]) @ diff )
+        # phi = torch.exp( -0.5 * diff.T @ torch.inverse(torch.diag(param_Sigma)) @ diff )
+        # phi = torch.exp( -0.5 * diff.T @ torch.inverse(torch.diag(param_Sigma[:,i])) @ diff )
         pi = pi + param_w[i] * phi
         
     return pi

@@ -69,7 +69,7 @@ class CustomCartPoleEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
 
     metadata = {
         "render_modes": ["human", "rgb_array"],
-        "render_fps": 50,
+        "render_fps": 20, #50,
     }
 
     def __init__(self, render_mode: Optional[str] = None):

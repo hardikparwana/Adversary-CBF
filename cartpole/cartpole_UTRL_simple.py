@@ -114,7 +114,8 @@ def generate_psd_matrices():
 
 # Set up environment
 env_to_render = CustomCartPoleEnv(render_mode="human")
-env = env_to_render #RecordVideo( env_to_render, video_folder="/home/hardik/Desktop/", name_prefix="Excartpole" )
+# env = env_to_render #RecordVideo( env_to_render, video_folder="/home/hardik/Desktop/", name_prefix="Excartpole" )
+env = RecordVideo( env_to_render, video_folder="/home/hardik/Desktop/", name_prefix="ExcartpoleSimple" )
 observation, info = env.reset(seed=42)
 
 polemass_length, gravity, length, masspole, total_mass, tau = torch.tensor(env.polemass_length), torch.tensor(env.gravity), torch.tensor(env.length), torch.tensor(env.masspole), torch.tensor(env.total_mass), torch.tensor(env.tau)
@@ -122,11 +123,14 @@ polemass_length, gravity, length, masspole, total_mass, tau = torch.tensor(env.p
 # Initialize parameters
 N = 50
 H = 10
-param_w = np.random.rand(N) - 0.5 
-param_mu = np.random.rand(4,N) - 0.5 * np.ones((4,N))
+param_w = np.random.rand(N) - 0.5#+ 2.0  #0.5 work with Lr: 5.0
+param_mu = np.random.rand(4,N) - 0.5 * np.ones((4,N)) #- 3.5 * np.ones((4,N))
 # param_Sigma = torch.rand(10)
 param_Sigma = generate_psd_matrices()
-lr_rate = 0.5
+
+# param_Sigma = np.random.rand(4,N)
+
+lr_rate = 0.5#0.001 #0.5
 noise = torch.tensor(0.1, dtype=torch.float)
 first_run = True
 # X = torch.rand(4).reshape(-1,1)
@@ -145,6 +149,9 @@ train_X = np.array([0,0,0,0, 0]).reshape(-1,1)
 train_Y = np.array([0,0,0,0]).reshape(-1,1)
 
 initialize_tensors( env, param_w, param_mu, param_Sigma )
+
+# print(f"s:{param_Sigma}, t:{torch.diag(param_Sigma)}")
+# exit()
 
 plt.ion()
 
@@ -203,9 +210,10 @@ for i in range(300):
         Sigma_grad = getGrad( env.Sigma_torch )
         
         param_w = np.clip( param_w - lr_rate * w_grad, -1000.0, 1000.0 )
-        param_mu = np.clip( param_mu - lr_rate * mu_grad, -1000.0, 1000.0 )        
+        param_mu = np.clip( param_mu - lr_rate * mu_grad, -1000.0, 1000.0 )       
+        param_Sigma = np.clip( param_Sigma - lr_rate * Sigma_grad, 0.05, 1000 ) 
         
-        # print(f"w:{param_w}")#, mu:{param_mu}")
+        print(f"w:{param_w}")#, mu:{param_Sigma}")
         # param_Sigma = np.clip( param_Sigma - lr_rate * Sigma_grad, -30.0, 30.0 )
         # Sigma = np.diag( param_Sigma[0:4] )
         # Sigma[0,1] = param_Sigma[4]; Sigma[1,0] = param_Sigma[4]; Sigma[0,2] = param_Sigma[5]; Sigma[2,0] = param_Sigma[5]
