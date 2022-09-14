@@ -3,7 +3,7 @@ from utils.utils import wrap_angle
 
 class Unicycle:
     
-    def __init__(self,X0,dt,ax,id,num_robots=1,num_adversaries = 1, num_obstacles = 0, alpha=0.8,color='r',palpha=1.0,plot=True):
+    def __init__(self,X0,dt,ax,id,num_robots=1,num_adversaries = 1, num_obstacles = 0, alpha=0.8,color='r',palpha=1.0,plot=True, robot_alpha = 0.8, adv_alpha = 0.8):
         '''
         X0: iniytial state
         dt: simulation time step
@@ -32,11 +32,13 @@ class Unicycle:
             self.render_plot()
         
         # for Trust computation
-        self.adv_alpha =  alpha*np.ones((1,num_adversaries))# alpha*np.ones((1,num_adversaries))
+        # self.adv_alpha =  alpha*np.ones((1,num_adversaries))# alpha*np.ones((1,num_adversaries))
+        self.adv_alpha =  adv_alpha*np.ones((1,num_adversaries))
         self.trust_adv = np.ones((1,num_adversaries))
         self.obs_alpha =  alpha*np.ones((1,num_obstacles))#
         self.trust_obs = np.ones((1,num_obstacles))
-        self.robot_alpha = alpha*np.ones((1,num_robots))
+        # self.robot_alpha = alpha*np.ones((1,num_robots))
+        self.robot_alpha = robot_alpha*np.ones((1,num_robots))
         self.trust_robot = np.ones((1,num_robots))
         self.adv_objective = [0] * num_adversaries
         self.robot_objective = [0] * num_robots

@@ -1,4 +1,5 @@
 from cProfile import label
+from os import sched_setaffinity
 import numpy as np
 import time
 import cvxpy as cp
@@ -9,7 +10,7 @@ from utils.utils import *
 
 from matplotlib.animation import FFMpegWriter
 
-plt.rcParams.update({'font.size': 27})
+plt.rcParams.update({'font.size': 16})
 
 # Sim Parameters                  
 dt = 0.05
@@ -23,7 +24,9 @@ min_dist = 1.0 # 0.1#0.05  # less than this and dercrease alpha
 cbf_extra_bad = 0.0
 update_param = True
 
-alpha_cbf = 0.7#1.4#0.8
+alpha_cbf = 0.8#1.4#0.8
+robot_alpha_cbf = 2.0 #0.8
+adv_alpha_cbf = 0.8
 alpha_der_max = 0.5#1.0#0.5
 
 # Plot                  
@@ -39,20 +42,21 @@ num_adversaries = 3
 alpha = 0.1
 
 default_plot = True
-save_plot = False
+adapt_plot = False
+save_plot = True
 movie_name = 'test0_default.mp4'
 
 # agents
 robots = []
 num_robots = 3
-robots.append( Unicycle(np.array([3,1.5,np.pi/2]), dt, ax, num_robots=num_robots, id = 0, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries ) )
-robots.append( Unicycle(np.array([2.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries ) )
-robots.append( Unicycle(np.array([3.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 2, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries ) )
+robots.append( Unicycle(np.array([3,1.5,np.pi/2]), dt, ax, num_robots=num_robots, id = 0, plot = adapt_plot, color='g',palpha=1.0, alpha=alpha_cbf, robot_alpha = alpha_cbf, adv_alpha = alpha_cbf, num_adversaries=num_adversaries ) )
+robots.append( Unicycle(np.array([2.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 1, plot = adapt_plot, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries ) )
+robots.append( Unicycle(np.array([3.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 2, plot = adapt_plot, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries ) )
 
 robots_default = []
-robots_default.append( Unicycle(np.array([3,1.5,np.pi/2]), dt, ax, num_robots=num_robots, id = 0, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, plot=default_plot ) )
-robots_default.append( Unicycle(np.array([2.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, plot=default_plot ) )
-robots_default.append( Unicycle(np.array([3.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 2, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, plot=default_plot ) )
+robots_default.append( Unicycle(np.array([3,1.5,np.pi/2]), dt, ax, num_robots=num_robots, id = 0, color='g',palpha=1.0, alpha=alpha_cbf, robot_alpha = robot_alpha_cbf, adv_alpha = adv_alpha_cbf, num_adversaries=num_adversaries, plot=default_plot ) )
+robots_default.append( Unicycle(np.array([2.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=1.0, alpha=alpha_cbf, robot_alpha = robot_alpha_cbf, adv_alpha = adv_alpha_cbf, num_adversaries=num_adversaries, plot=default_plot ) )
+robots_default.append( Unicycle(np.array([3.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 2, color='g',palpha=1.0, alpha=alpha_cbf, robot_alpha = robot_alpha_cbf, adv_alpha = adv_alpha_cbf, num_adversaries=num_adversaries, plot=default_plot ) )
 
 # agent nominal version
 robots_nominal = []
@@ -106,6 +110,8 @@ delta_relaxed = cp.Variable((num_constraints1_relaxed,1))
 const1_relaxed = [A1_relaxed @ u1_relaxed <= b1_relaxed + delta_relaxed]
 objective1_relaxed = cp.Minimize( 10000 * cp.sum_squares( u1_relaxed - u1_ref_relaxed  ) + 10 * cp.sum_squares( delta_relaxed ) )
 cbf_controller_relaxed = cp.Problem( objective1_relaxed, const1_relaxed )
+
+stop_nominal = False
 
 
 ###### 2: Best case controller
@@ -223,7 +229,6 @@ with writer.saving(fig, movie_name, 100):
                 robots[j].A1[const_index,:] = dh_dxi @ robots[j].g()
                 robots[j].b1[const_index] = -dh_dxi @ robots[j].f() - dh_dxk @ ( greedy[k].f() + greedy[k].g() @ greedy[k].U ) - cbf_extra_bad - robots[j].adv_alpha[0,k] * h
                 
-
                 # Best Case LP objective
                 robots[j].adv_objective[k] = dh_dxi @ robots[j].g()
                 
@@ -239,7 +244,6 @@ with writer.saving(fig, movie_name, 100):
                 robots_default[j].adv_objective[k] = dh_dxi @ robots_default[j].g()
                 ##########################################
                 
-                
                 const_index = const_index + 1
                 
             for k in range(num_robots):
@@ -254,10 +258,8 @@ with writer.saving(fig, movie_name, 100):
                 robots[j].A1[const_index,:] = dh_dxj @ robots[j].g()
                 robots[j].b1[const_index] = -dh_dxj @ robots[j].f() - dh_dxk @ ( robots[k].f() + robots[k].g() @ robots[k].U ) - cbf_extra_bad - robots[j].robot_alpha[0,k] * h
                 
-                
                 # Best Case LP objective
                 robots[j].robot_objective[k] = dh_dxj @ robots[j].g()
-                
                 
                 ### Default ###############################
                 h, dh_dxj, dh_dxk = robots_default[j].agent_barrier(robots_default[k], d_min);
@@ -365,6 +367,7 @@ with writer.saving(fig, movie_name, 100):
             cbf_controller.solve(solver=cp.GUROBI) 
             if cbf_controller.status!='optimal':
                 print(f"{j}'s input: {cbf_controller.status}")
+                stop_nominal = True
                 # robots_default[j].nextU = robots_default[j].U_ref # TODO: take care of this
                 # A1_relaxed.value = A1.value
                 # b1_relaxed.value = b1.value
@@ -391,8 +394,9 @@ with writer.saving(fig, movie_name, 100):
             robots[j].render_plot()
             # print(f"{j} state: {robots[j].X[1,0]}, input:{robots[j].nextU[0,0]}, {robots[j].nextU[1,0]}")
             
-            robots_default[j].step( robots_default[j].nextU )
-            robots_default[j].render_plot()
+            if not stop_nominal:
+                robots_default[j].step( robots_default[j].nextU )
+                robots_default[j].render_plot()
             # print(f"{j} state: {robots[j].X[1,0]}, input:{robots[j].nextU[0,0]}, {robots[j].nextU[1,0]}")
         
         t = t + dt
@@ -494,6 +498,7 @@ axis6.plot(tp,robots[0].trust_robots[1:,2]/2,'k',label='Robot 1 trust of 3 ')
 axis6.plot(tp,robots[2].trust_robots[1:,0]/2,'k--',label='Robot 3 trust of 1 ')
 axis6.legend()
 axis6.set_xlabel('time (s)')
+axis6.set_ylabel(r'Robot 1 $\alpha_{1j}$ ')
 
 ######### Barriers ##########
 # Robot 0
@@ -525,18 +530,20 @@ figure5, axis5 = plt.subplots(1, 1)
 axis5.plot(tp,-robots[0].adv_hs[1:,0],'r',label='Adversary - Proposed')
 axis5.plot(tp,-robots[0].robot_hs[1:,1],'g',label='Robot 2 - Proposed')
 axis5.plot(tp,-robots[0].robot_hs[1:,2],'k',label='Robot 3 - Proposed')
-axis5.plot(tp,-robots_default[0].adv_hs[1:,0],'r--',label=r'Adversary - fixed $\alpha$')
-axis5.plot(tp,-robots_default[0].robot_hs[1:,1],'g--',label=r'Robot - fixed $\alpha$')
-axis5.plot(tp,-robots_default[0].robot_hs[1:,2],'k--',label=r'Robot - fixed $\alpha$')
+axis5.plot(tp,-robots_default[0].adv_hs[1:,0],'r--',label=r'Adversary - fixed $\alpha_{1j}$')
+axis5.plot(tp,-robots_default[0].robot_hs[1:,1],'g--',label=r'Robot 2 - fixed $\alpha_{1j}$')
+axis5.plot(tp,-robots_default[0].robot_hs[1:,2],'k--',label=r'Robot 3 - fixed $\alpha_{1j}$')
 axis5.legend()
 axis5.set_xlabel('time (s)')
+axis5.set_ylabel(r'Barrier Function h_{1j}')
 # plt.show()
 
 figure8, axis8 = plt.subplots(1, 1)
 axis8.plot(tp,robots[0].adv_alphas[1:,0],'r',label='Adversary')
 axis8.plot(tp,robots[0].robot_alphas[1:,1],'g',label='Robot 2')
 axis8.plot(tp,robots[0].robot_alphas[1:,2],'k',label='Robot 3')
-axis8.set_title('Robot 1 alphas')
+# axis8.set_title(r'Robot 1 \alpha_{1j}')
+axis8.set_ylabel(r'Robot 1 \alpha_{1j}')
 axis8.set_xlabel('time (s)')
 axis8.legend()
 
@@ -634,23 +641,26 @@ figure7.colorbar(im2, ax=axis7)
 axis4.set_xlabel('X')
 axis4.set_ylabel('Y')
 
-plt.show()
-
-
 
 print("hello")
 
 #'Accent', 'Accent_r', 'Blues', 'Blues_r', 'BrBG', 'BrBG_r', 'BuGn', 'BuGn_r', 'BuPu', 'BuPu_r', 'CMRmap', 'CMRmap_r', 'Dark2', 'Dark2_r', 'GnBu', 'GnBu_r', 'Greens', 'Greens_r', 'Greys', 'Greys_r', 'OrRd', 'OrRd_r', 'Oranges', 'Oranges_r', 'PRGn', 'PRGn_r', 'Paired', 'Paired_r', 'Pastel1', 'Pastel1_r', 'Pastel2', 'Pastel2_r', 'PiYG', 'PiYG_r', 'PuBu', 'PuBuGn', 'PuBuGn_r', 'PuBu_r', 'PuOr', 'PuOr_r', 'PuRd', 'PuRd_r', 'Purples', 'Purples_r', 'RdBu', 'RdBu_r', 'RdGy', 'RdGy_r', 'RdPu', 'RdPu_r', 'RdYlBu', 'RdYlBu_r', 'RdYlGn', 'RdYlGn_r', 'Reds', 'Reds_r', 'Set1', 'Set1_r', 'Set2', 'Set2_r', 'Set3', 'Set3_r', 'Spectral', 'Spectral_r', 'Wistia', 'Wistia_r', 'YlGn', 'YlGnBu', 'YlGnBu_r', 'YlGn_r', 'YlOrBr', 'YlOrBr_r', 'YlOrRd', 'YlOrRd_r', 'afmhot', 'afmhot_r', 'autumn', 'autumn_r', 'binary', 'binary_r', 'bone', 'bone_r', 'brg', 'brg_r', 'bwr', 'bwr_r', 'cividis', 'cividis_r', 'cool', 'cool_r', 'coolwarm', 'coolwarm_r', 'copper', 'copper_r', 'cubehelix', 'cubehelix_r', 'flag', 'flag_r', 'gist_earth', 'gist_earth_r', 'gist_gray', 'gist_gray_r', 'gist_heat', 'gist_heat_r', 'gist_ncar', 'gist_ncar_r', 'gist_rainbow', 'gist_rainbow_r', 'gist_stern', 'gist_stern_r', 'gist_yarg', 'gist_yarg_r', 'gnuplot', 'gnuplot2', 'gnuplot2_r', 'gnuplot_r', 'gray', 'gray_r', 'hot', 'hot_r', 'hsv', 'hsv_r', 'inferno', 'inferno_r', 'jet', 'jet_r', 'magma', 'magma_r', 'nipy_spectral', 'nipy_spectral_r', 'ocean', 'ocean_r', 'pink', 'pink_r', 'plasma', 'plasma_r', 'prism', 'prism_r', 'rainbow', 'rainbow_r', 'seismic', 'seismic_r', 'spring', 'spring_r', 'summer', 'summer_r', 'tab10', 'tab10_r', 'tab20', 'tab20_r', 'tab20b', 'tab20b_r', 'tab20c', 'tab20c_r', 'terrain', 'terrain_r', 'turbo', 'turbo_r', 'twilight', 'twilight_r', 'twilight_shifted', 'twilight_shifted_r', 'viridis', 'viridis_r', 'winter', 'winter_r'
 
 if save_plot:
-    figure1.savefig("alphas.eps")
-    figure2.savefig("trust.eps")
-    figure3.savefig("cbfs.eps")
+    figure1.savefig("new_alphas.eps")
+    figure2.savefig("new_trust.eps")
+    figure3.savefig("new_cbfs.eps")
+    figure6.savefig("new_trust_common.eps")
+    figure6.savefig("new_alphas.eps")
     
     axis4.set_rasterization_zorder(1)
-    figure4.savefig("trajectory.eps", dpi=50, rasterized=True)
-    figure4.savefig("trajectory.png")
-    figure5.savefig("barriers_robot_1.eps")
-    figure6.savefig("trusts.eps")
-    figure8.savefig("alphas.eps")
-    figure8.savefig("alphas.png")
+    figure4.savefig("new_trajectory.eps", dpi=50, rasterized=True)
+    figure4.savefig("new_trajectory.png")
+    figure5.savefig("new_barriers_robot_1.eps")
+    figure5.savefig("new_barriers_robot_1.png")
+    figure6.savefig("new_trusts.eps")
+    figure8.savefig("new_alphas.eps")
+    figure8.savefig("new_alphas.png")
+    figure6.savefig("new_trust_common.png")
+    
+plt.show()
