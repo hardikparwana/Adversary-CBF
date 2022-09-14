@@ -240,9 +240,9 @@ l = 2.0
 plot_x_lim = (0,10)
 plot_y_lim = (-4,10)
 
-no_adapt_movie_name = 'Take8_no_adapt.mp4'
-adapt_no_noise_movie_name = 'Take8_adapt_no_noise.mp4'
-adapt_noise_movie_name = 'Take8_adapt_noise.mp4'
+no_adapt_movie_name = 'Take9_no_adapt.mp4'
+adapt_no_noise_movie_name = 'Take9_adapt_no_noise.mp4'
+adapt_noise_movie_name = 'Take9_adapt_noise.mp4'
 
 # Plotting             
 plt.ion()
@@ -250,7 +250,7 @@ plt.ion()
 
 ## Without noise: perfect knowledge??
 
-noise  = 0.5
+noise  = 1.0 #0.5
 
 metadata = dict(title='Movie Adapt 0', artist='Matplotlib',comment='Movie support!')
 writer = FFMpegWriter(fps=15, metadata=metadata)

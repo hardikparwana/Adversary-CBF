@@ -78,6 +78,24 @@ def get_ut_cov_root(cov):
         root_term = sqrtm((n+k)*cov)
     return root_term
 
+def get_ut_cov_root_diagonal(cov):
+    k = 2
+    n = cov.shape[0]
+    
+    cov_abs = torch.abs(cov)
+    if cov_abs[0,0]>0.01:
+        root0 = torch.sqrt(cov[0,0])
+    else:
+        root0 = torch.tensor(0, dtype=torch.float)
+    if cov_abs[1,1]>0.01:
+        root1 = torch.sqrt(cov[1,1])
+    else:
+        root1 = torch.tensor(0, dtype=torch.float)
+    
+    root_term = torch.diag( (n+k) * torch.cat( ( root0.reshape(-1,1), root1.reshape(-1,1) ), dim = 1 )[0] )
+
+    return root_term
+
 # @torch.jit.script
 def sigma_point_expand_JIT(robot_state, sigma_points, weights, cur_t, noise):
    
@@ -89,7 +107,7 @@ def sigma_point_expand_JIT(robot_state, sigma_points, weights, cur_t, noise):
     # mu, cov = leader.gp.predict_torch( sys_state ) # all are tensors here
     mu, cov = traced_predict_function_jit(cur_t, noise)  
     
-    root_term = get_ut_cov_root(cov) 
+    root_term = get_ut_cov_root_diagonal(cov) 
     
     # if first_generate_sigma_run:
     #     traced_generate_sigma_points_JIT = torch.jit.trace( generate_sigma_points_JIT, ( mu, root_term ) )
@@ -105,7 +123,7 @@ def sigma_point_expand_JIT(robot_state, sigma_points, weights, cur_t, noise):
         mu, cov = traced_predict_function_jit(cur_t, noise)  
         
         # TODO
-        root_term = get_ut_cov_root(cov)        
+        root_term = get_ut_cov_root_diagonal(cov)        
         
         temp_points, temp_weights = traced_generate_sigma_points_JIT( mu, root_term )
 

@@ -1,3 +1,4 @@
+from xml.dom.minidom import parse
 import numpy as np
 import torch
 
@@ -29,7 +30,7 @@ def euler_rate_matrix(phi,theta,psi):
                       [ 0,  np.sin(phi)/np.cos(theta), np.cos(phi)*np.sin(theta) ] ] )
     
 # Helper Functions to solve QP #####################################################################
-def getGrad(param):
+def getGrad(param, l_bound = -2, u_bound = 2):
             if param.grad==None:
                 print("Grad NONE")
                 try: 
@@ -38,6 +39,7 @@ def getGrad(param):
                     return np.zeros(param.shape[0])
             value = param.grad.detach().numpy()
             param.grad = None
+            value = np.clip( value, l_bound, u_bound )
             return value  
         
     

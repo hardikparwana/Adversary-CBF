@@ -249,7 +249,7 @@ class CustomCartPoleEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         # Note that if you use custom reset bounds, it may lead to out-of-bound
         # state/observations.
         low, high = utils.maybe_parse_reset_bounds(
-            options, -0.05, 0.05  # default low
+            options,  -0.05, 0.05  # default low #-1.0, 1.0 #
         )  # default high
         self.state = self.np_random.uniform(low=low, high=high, size=(4,))
         self.steps_beyond_terminated = None
@@ -379,9 +379,11 @@ def get_state_dot_torch(X, action, polemass_length, gravity, length, masspole, t
     
 def get_state_dot_noisy_torch(X, action, polemass_length, gravity, length, masspole, total_mass, tau):
     X_dot = get_state_dot_torch(X, action, polemass_length, gravity, length, masspole, total_mass, tau)
-    error_square = torch.square(X_dot/4)
+    error_square = torch.square(X_dot)
+    # error_square = torch.square(X_dot/2)
     cov = torch.diag( error_square[:,0] )
     # cov = torch.zeros((4,4))
+    X_dot = X_dot + X_dot/2 #X_dot = X_dot + X_dot/6
     return X_dot, cov
     
     

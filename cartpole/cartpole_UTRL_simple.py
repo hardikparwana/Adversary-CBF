@@ -112,6 +112,26 @@ def generate_psd_matrices():
             B = np.append( B, A.reshape( (n,n,1) ), axis = 2 )   
     return B
 
+def generate_psd_params():
+    n = 4
+    N = 50
+    
+    diag = np.random.rand(n) + n
+    off_diag = np.random.rand(int( (n**2-n)/2.0 ))
+    params = np.append(diag, off_diag, axis = 0).reshape(1,-1)
+    
+    for i in range(1,50):
+        # Diagonal elements
+        params_temp = np.random.rand( int(n + (n**2 -n)/2.0) ).reshape(1,-1)
+        
+        # ## lower Off-diagonal
+        # off_diag = np.random.rand(int( (n**2-n)/2.0 ))
+        
+        # params_temp = np.append(diag, off_diag, axis = 0).reshape(1,-1)
+        params = np.append( params, params_temp, axis = 0 )
+    
+    return params
+
 # Set up environment
 env_to_render = CustomCartPoleEnv(render_mode="human")
 # env = env_to_render #RecordVideo( env_to_render, video_folder="/home/hardik/Desktop/", name_prefix="Excartpole" )
@@ -123,14 +143,16 @@ polemass_length, gravity, length, masspole, total_mass, tau = torch.tensor(env.p
 # Initialize parameters
 N = 50
 H = 10
-param_w = np.random.rand(N) - 0.5#+ 2.0  #0.5 work with Lr: 5.0
+np.random.seed(0)
+param_w = np.random.rand(N) + 0.5#+ 2.0  #0.5 work with Lr: 5.0
 param_mu = np.random.rand(4,N) - 0.5 * np.ones((4,N)) #- 3.5 * np.ones((4,N))
 # param_Sigma = torch.rand(10)
-param_Sigma = generate_psd_matrices()
+# param_Sigma = generate_psd_matrices()
+param_Sigma = generate_psd_params()
 
 # param_Sigma = np.random.rand(4,N)
 
-lr_rate = 0.5#0.001 #0.5
+lr_rate = 0.5 #0.5#0.001 #0.5
 noise = torch.tensor(0.1, dtype=torch.float)
 first_run = True
 # X = torch.rand(4).reshape(-1,1)
@@ -155,7 +177,7 @@ initialize_tensors( env, param_w, param_mu, param_Sigma )
 
 plt.ion()
 
-for i in range(300):
+for i in range(400): #300
      
     if (i % outer_loop != 0) or i<1:
     
@@ -205,13 +227,16 @@ for i in range(300):
         reward = get_future_reward( env, params, covs, torch.tensor(X_s, dtype=torch.float), torch.tensor(Y_s, dtype=torch.float), noise, gps )        
         reward.backward(retain_graph = True)
         
-        w_grad = getGrad( env.w_torch )
-        mu_grad = getGrad( env.mu_torch )
-        Sigma_grad = getGrad( env.Sigma_torch )
+        w_grad = getGrad( env.w_torch, l_bound = -2, u_bound = 2 )
+        mu_grad = getGrad( env.mu_torch, l_bound = -2, u_bound = 2 )
+        Sigma_grad = getGrad( env.Sigma_torch, l_bound = -2, u_bound = 2 )
         
         param_w = np.clip( param_w - lr_rate * w_grad, -1000.0, 1000.0 )
         param_mu = np.clip( param_mu - lr_rate * mu_grad, -1000.0, 1000.0 )       
-        param_Sigma = np.clip( param_Sigma - lr_rate * Sigma_grad, 0.05, 1000 ) 
+        param_Sigma[:,0:4] = np.clip( param_Sigma[:,0:4] - lr_rate * Sigma_grad[:,0:4], 1, 3 ) 
+        param_Sigma[:,4:] = np.clip( param_Sigma[:,4:] - lr_rate * Sigma_grad[:,4:], -1, 1 )
+        
+        # param_Sigma[ = np.clip( param_Sigma - lr_rate * Sigma_grad, 0.05, 1000 ) 
         
         print(f"w:{param_w}")#, mu:{param_Sigma}")
         # param_Sigma = np.clip( param_Sigma - lr_rate * Sigma_grad, -30.0, 30.0 )
