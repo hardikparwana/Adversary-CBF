@@ -32,7 +32,7 @@ def euler_rate_matrix(phi,theta,psi):
 # Helper Functions to solve QP #####################################################################
 def getGrad(param, l_bound = -2, u_bound = 2):
             if param.grad==None:
-                print("Grad NONE")
+                # print("Grad NONE")
                 try: 
                     return np.zeros(( param.shape[0], param.shape[1] ))
                 except:
