@@ -147,3 +147,5 @@ def unicycle_nominal_input_tensor_jit(X, targetX):
     omega = omega.reshape(-1,1)
     U = torch.cat((v,omega))
     return U
+
+traced_unicycle_nominal_input_tensor_jit = torch.jit.trace( unicycle_nominal_input_tensor_jit, ( torch.ones(3,1), torch.ones(2,1) ) )

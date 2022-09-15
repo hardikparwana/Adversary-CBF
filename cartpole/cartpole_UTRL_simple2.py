@@ -136,14 +136,14 @@ def generate_psd_params():
 # Set up environment
 env_to_render = CustomCartPoleEnv(render_mode="rgb_array")
 # env = env_to_render #RecordVideo( env_to_render, video_folder="/home/hardik/Desktop/", name_prefix="Excartpole" )
-env = RecordVideo( env_to_render, video_folder="/home/hardik/Desktop/", name_prefix="ExcartpoleSimpleH20" )
+env = RecordVideo( env_to_render, video_folder="/home/hardik/Desktop/", name_prefix="ExcartpoleSimpleH80" )
 observation, info = env.reset(seed=42)
 
 polemass_length, gravity, length, masspole, total_mass, tau = torch.tensor(env.polemass_length), torch.tensor(env.gravity), torch.tensor(env.length), torch.tensor(env.masspole), torch.tensor(env.total_mass), torch.tensor(env.tau)
 
 # Initialize parameters
 N = 50
-H = 20
+H = 80
 np.random.seed(0)
 param_w = np.random.rand(N) + 0.5#+ 2.0  #0.5 work with Lr: 5.0
 param_mu = np.random.rand(4,N) - 0.5 * np.ones((4,N)) #- 3.5 * np.ones((4,N))
@@ -161,8 +161,8 @@ first_run = True
 # Initialize sim parameters
 t = 0
 dt_inner = 0.02
-dt_outer = 0.02 # 0.02
-outer_loop = 2#10 #2
+dt_outer = 0.2 # 0.02
+outer_loop = 2#4#10 #2
 GA = 1.0
 PE = 0.0
 # gps = initialize_gps(noise.item())

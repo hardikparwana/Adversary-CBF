@@ -59,6 +59,8 @@ def policy(param_w, param_mu, param_Sigma, X):
         # phi = torch.exp( -0.5 * diff.T @ torch.inverse(torch.diag(param_Sigma[:,i])) @ diff )
         pi = pi + param_w[i] * phi
         
+    if torch.abs( pi ) > 10:
+        pi = pi / torch.abs(pi) * 10
     return pi
         
         

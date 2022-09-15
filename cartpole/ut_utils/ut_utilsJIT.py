@@ -9,7 +9,7 @@ def get_mean_JIT(sigma_points, weights):
     mu = torch.sum( weighted_points, 1 ).reshape(-1,1)
     return mu
 
-def get_mean_cov_JIT(sigma_points, weights):
+def get_mean_cov_JIT81(sigma_points, weights):
     
     # mean
     weighted_points = sigma_points * weights[0]
@@ -22,7 +22,9 @@ def get_mean_cov_JIT(sigma_points, weights):
     
     # print(f"Checking for Nans: {torch.isnan(cov).any()}")
     return mu, cov
+traced_get_mean_cov_JIT81 = torch.jit.trace( get_mean_cov_JIT81, (torch.ones( (4 , 81) ), 0.5 * torch.ones( (1,81) ) ) )
 
+# @torch.jit.script
 def get_ut_cov_root(cov):
     k = -1
     n = cov.shape[0]
@@ -33,6 +35,7 @@ def get_ut_cov_root(cov):
         root_term = sqrtm((n+k)*cov)
     return root_term
 
+# @torch.jit.script
 def get_ut_cov_root_diagonal(cov):
     k = -1
     n = cov.shape[0]
@@ -71,7 +74,7 @@ def initialize_sigma_points_JIT(X):
     weights = torch.ones((1,num_points)) * 1.0/( num_points )
     return sigma_points, weights
 
-def generate_sigma_points_JIT( mu, cov_root, base_term, factor ):
+def generate_sigma_points9_JIT( mu, cov_root, base_term, factor ):
     
     n = mu.shape[0]     
     N = 2*n + 1 # total points
@@ -93,7 +96,7 @@ def generate_sigma_points_JIT( mu, cov_root, base_term, factor ):
 
 mu_t = torch.ones((4,1)).reshape(-1,1)
 cov_t = torch.tensor([ [ 1.0, 0.0, 0.0, 0.0 ], [0.0, 3.0, 0.0, 0.0], [0.0, 0.0, 4.0, 0.0], [0.0, 0.0, 0.0, 1.5] ])
-traced_generate_sigma_points_JIT = generate_sigma_points_JIT #torch.jit.trace( generate_sigma_points_JIT, ( mu_t, cov_t, torch.ones((4,1)), torch.tensor(1.0) ) )
+traced_generate_sigma_points9_JIT = torch.jit.trace( generate_sigma_points9_JIT, ( mu_t, cov_t, torch.ones((4,1)), torch.tensor(1.0) ) )
 
 def sigma_point_expand_JIT(GA, PE, gp_params, K_invs, noise, X_s, Y_s, sigma_points, weights, control, dt_outer, dt_inner, polemass_length, gravity, length, masspole, total_mass, tau):#, gps):
    
@@ -118,7 +121,7 @@ def sigma_point_expand_JIT(GA, PE, gp_params, K_invs, noise, X_s, Y_s, sigma_poi
     ###############################################################################
     
     root_term = get_ut_cov_root_diagonal(cov) 
-    temp_points, temp_weights = traced_generate_sigma_points_JIT( mu, root_term, sigma_points[:,0].reshape(-1,1), dt_outer )
+    temp_points, temp_weights = traced_generate_sigma_points9_JIT( mu, root_term, sigma_points[:,0].reshape(-1,1), dt_outer )
     new_points = torch.clone( temp_points )
     new_weights = (torch.clone( temp_weights ) * weights[0,0]).reshape(1,-1)
         
@@ -136,7 +139,7 @@ def sigma_point_expand_JIT(GA, PE, gp_params, K_invs, noise, X_s, Y_s, sigma_poi
         ###############################################################################
 
         root_term = get_ut_cov_root_diagonal(cov)           
-        temp_points, temp_weights = traced_generate_sigma_points_JIT( mu, root_term, sigma_points[:,i].reshape(-1,1), dt_outer )
+        temp_points, temp_weights = traced_generate_sigma_points9_JIT( mu, root_term, sigma_points[:,i].reshape(-1,1), dt_outer )
         new_points = torch.cat((new_points, temp_points), dim=1 )
         new_weights = torch.cat( (new_weights, (temp_weights * weights[0,i]).reshape(1,-1) ) , dim=1 )
             
@@ -144,10 +147,10 @@ def sigma_point_expand_JIT(GA, PE, gp_params, K_invs, noise, X_s, Y_s, sigma_poi
     return new_points, new_weights
 
 def sigma_point_compress_JIT( sigma_points, weights ):
-    mu, cov = get_mean_cov_JIT( sigma_points, weights )
+    mu, cov = traced_get_mean_cov_JIT81( sigma_points, weights )
     cov_root_term = get_ut_cov_root( cov )  
     base_term = torch.zeros((mu.shape))
-    return generate_sigma_points_JIT( mu, cov_root_term, base_term, torch.tensor(1.0) )
+    return traced_generate_sigma_points9_JIT( mu, cov_root_term, base_term, torch.tensor(1.0) )
 
 def reward_UT_Mean_Evaluator_basic(sigma_points, weights):
     mu = compute_reward_jit( sigma_points[:,0].reshape(-1,1)  ) *  weights[0,0]
@@ -157,4 +160,9 @@ def reward_UT_Mean_Evaluator_basic(sigma_points, weights):
 
 def compute_reward_jit( state ):
     theta = state[2,0] # want theta and theta_dot to be 0
-    return - 100 * torch.cos(theta)
+    speed = state[1,0]
+    pos = state[0,0]
+    # return - 100 * torch.cos(theta) #+ 0.1 * torch.square(speed)
+    return - 100 * torch.cos(theta) + 0.1 * torch.square(speed)
+    # return - 100 * torch.cos(theta) + 0.1 * torch.square(pos) + 0.1 * torch.square(speed)
+    # return - 100 * torch.cos(theta) + 0.1 * torch.square(pos)

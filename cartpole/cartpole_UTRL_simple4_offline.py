@@ -13,7 +13,7 @@ from utils.mvgp_jit import *
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel, ConstantKernel
 
-from robot_models.custom_cartpole import CustomCartPoleEnv
+from robot_models.custom_cartpole4 import CustomCartPoleEnv
 from gym_wrappers.record_video import RecordVideo
 from cartpole_policy import policy
 
@@ -136,16 +136,16 @@ def generate_psd_params():
 # Set up environment
 env_to_render = CustomCartPoleEnv(render_mode="rgb_array")
 # env = env_to_render #RecordVideo( env_to_render, video_folder="/home/hardik/Desktop/", name_prefix="Excartpole" )
-env = RecordVideo( env_to_render, video_folder="/home/hardik/Desktop/", name_prefix="ExcartpoleSimpleH20" )
+env = RecordVideo( env_to_render, video_folder="/home/hardik/Desktop/", name_prefix="ExcartpoleSimpleOfflineH80_lessnoise0_06dt_init_random" )
 observation, info = env.reset(seed=42)
 
 polemass_length, gravity, length, masspole, total_mass, tau = torch.tensor(env.polemass_length), torch.tensor(env.gravity), torch.tensor(env.length), torch.tensor(env.masspole), torch.tensor(env.total_mass), torch.tensor(env.tau)
 
 # Initialize parameters
 N = 50
-H = 20
+H = 80
 np.random.seed(0)
-param_w = np.random.rand(N) + 0.5#+ 2.0  #0.5 work with Lr: 5.0
+param_w = np.random.rand(N) - 0.5#+ 0.5#+ 2.0  #0.5 work with Lr: 5.0
 param_mu = np.random.rand(4,N) - 0.5 * np.ones((4,N)) #- 3.5 * np.ones((4,N))
 # param_Sigma = torch.rand(10)
 # param_Sigma = generate_psd_matrices()
@@ -161,8 +161,8 @@ first_run = True
 # Initialize sim parameters
 t = 0
 dt_inner = 0.02
-dt_outer = 0.02 # 0.02
-outer_loop = 2#10 #2
+dt_outer = 0.06 # 0.02 # first video with 0.06
+outer_loop = 2#4#10 #2
 GA = 1.0
 PE = 0.0
 # gps = initialize_gps(noise.item())
@@ -178,9 +178,14 @@ initialize_tensors( env, param_w, param_mu, param_Sigma )
 
 plt.ion()
 
-for i in range(400): #300
+for i in range(800): #300
+    
+    if i==100:
+         lr_rate = lr_rate / 2
+    elif i == 200:
+         lr_rate = lr_rate / 2
      
-    if (i % outer_loop != 0) or i<1:
+    if (i > 400): # (i % outer_loop != 0) or i<1:
     
         # Find input
         state = env.get_state()
@@ -236,7 +241,7 @@ for i in range(400): #300
         param_mu = np.clip( param_mu - lr_rate * mu_grad, -1000.0, 1000.0 )       
         param_Sigma[:,0:4] = np.clip( param_Sigma[:,0:4] - lr_rate * Sigma_grad[:,0:4], 1, 3 ) 
         param_Sigma[:,4:] = np.clip( param_Sigma[:,4:] - lr_rate * Sigma_grad[:,4:], -1, 1 )
-        
+        print(f"i:{i}")
         # param_Sigma[ = np.clip( param_Sigma - lr_rate * Sigma_grad, 0.05, 1000 ) 
         
         # print(f"w:{param_w}")#, mu:{param_Sigma}")

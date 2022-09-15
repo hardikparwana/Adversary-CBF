@@ -36,11 +36,14 @@ def getGrad(param, l_bound = -2, u_bound = 2):
                 try: 
                     return np.zeros(( param.shape[0], param.shape[1] ))
                 except:
-                    return np.zeros(param.shape[0])
+                    try:
+                        return np.zeros(param.shape[0])
+                    except:
+                        return 0.0
             value = param.grad.detach().numpy()
             param.grad = None
             value = np.clip( value, l_bound, u_bound )
-            return value  
+            return value
         
     
 # def compute_trust(A,b,uj,uj_nominal,h,min_dist):

@@ -5,12 +5,14 @@ from torch.autograd import Function
 import numpy as np
 import scipy.linalg
 
+@torch.jit.ignore
 class MatrixSquareRoot(Function):
     """Square root of a positive definite matrix.
 
     NOTE: matrix square root is not differentiable for matrices with
           zero eigenvalues.
     """
+    # @torch.jit.ignore
     @staticmethod
     def forward(ctx, input):
         m = input.detach().cpu().numpy().astype(np.float_)

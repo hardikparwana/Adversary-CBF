@@ -139,3 +139,39 @@ class SingleIntegrator2D:
             dh_dxj = np.append( -2*( self.X - agent.X[0:2] ).T, [[0]], axis=1 )
         return h, dh_dxi, dh_dxj
     
+    
+
+def leader_motion_predict(t):
+    uL = 2.0 # 
+    vL = 3*np.sin(np.pi*t*4) #  0.1 # 1.2
+    # uL = 1
+    # vL = 1
+    return uL, vL
+
+def leader_motion(t, noise = 0.0):
+    # uL = 0.5 + 0.5
+    # vL = 3*np.sin(np.pi*t*4) + 2.0 * np.sin(np.pi*t*4) + 0.1#  0.1 # 1.2
+    # uL = 0.5 + 0.5
+    # vL = 3*np.sin(np.pi*t*4) + 0.5#  0.1 # 1.2
+    uL = 2.0
+    vL = 3*np.sin(np.pi*t*4) # + 0.5#  0.1 # 1.2
+    
+    # uL = 1
+    # vL = 1
+    return uL, vL
+
+def leader_predict(t, noise = 0.0):
+    uL, vL = leader_motion_predict(t)
+    # print("noise", noise)
+    mu = torch.tensor([[uL, vL]], dtype=torch.float).reshape(-1,1)
+    bias = mu / 4
+    mu = mu +  bias #torch.tensor([0.5, 0.5]).reshape(-1,1)
+    cov = torch.zeros((2,2), dtype=torch.float)
+    # cov[0,0] = noise
+    # cov[1,1] = noise
+    cov[0,0] = torch.square( torch.norm(bias)/2 )
+    cov[1,1] = torch.square( torch.norm(bias)/2 )
+    return mu, cov
+traced_leader_predict_jit = leader_predict #torch.jit.trace( leader_predict, ( torch.tensor(0), torch.tensor(0) ) )
+
+

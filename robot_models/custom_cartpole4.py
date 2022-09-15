@@ -86,7 +86,7 @@ class CustomCartPoleEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         # Angle at which to fail the episode
         self.theta_threshold_radians = 12 * 2 * math.pi / 360
         # self.x_threshold = 2.4
-        self.x_threshold = 6.0 #5.0
+        self.x_threshold = 7.0 #5.0
 
         # Angle limit set to 2 * theta_threshold_radians so failing observation
         # is still within bounds.
@@ -164,10 +164,10 @@ class CustomCartPoleEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
             theta = self.clip_theta(theta + self.tau * theta_dot)
             
         if x > self.x_threshold:
-            x = 0
+            x = 0 #self.x_threshold
         elif x < -self.x_threshold:
-            x = 0
-                        
+            x = 0 #-self.x_threshold
+            
         # print(f"pos: {x}, theta:{theta}")
 
         self.state = (x, x_dot, theta, theta_dot)
@@ -383,11 +383,11 @@ def get_state_dot_torch(X, action, polemass_length, gravity, length, masspole, t
     
 def get_state_dot_noisy_torch(X, action, polemass_length, gravity, length, masspole, total_mass, tau):
     X_dot = get_state_dot_torch(X, action, polemass_length, gravity, length, masspole, total_mass, tau)
-    error_square = torch.square(X_dot)
-    # error_square = torch.square(X_dot/2)
+    # error_square = torch.square(X_dot)
+    error_square = torch.square(X_dot/2)
     cov = torch.diag( error_square[:,0] )
     # cov = torch.zeros((4,4))
-    X_dot = X_dot + X_dot/2 #X_dot = X_dot + X_dot/6
+    X_dot = X_dot #+ X_dot/2 #X_dot = X_dot + X_dot/6
     return X_dot, cov
     
     

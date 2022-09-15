@@ -24,6 +24,8 @@ warnings.filterwarnings("ignore", category=torch.jit.TracerWarning)
 
 #############################################################
 # CBF Controller: centralized
+u1_max = 3.0
+u2_max = 3.0
 u1 = cp.Variable((2,1))
 delta = cp.Variable((4,1))
 u1_ref = cp.Parameter((2,1),value = np.zeros((2,1)) )
@@ -31,6 +33,8 @@ num_constraints1 = 1 + 3
 A1 = cp.Parameter((num_constraints1,2),value=np.zeros((num_constraints1,2)))
 b1 = cp.Parameter((num_constraints1,1),value=np.zeros((num_constraints1,1)))
 const1 = [A1 @ u1 + b1 + delta >= 0]
+const1 += [ cp.abs( u1[0,0] ) <=  u1_max ]
+const1 += [ cp.abs( u1[1,0] ) <= u2_max ]
 const1 += [ delta[1] == 0 ]
 const1 += [ delta[2] == 0 ]
 const1 += [ delta[3] == 0 ]
@@ -61,9 +65,9 @@ def initialize_tensors(follower, leader):
     follower.alpha_torch = torch.tensor(follower.alpha, dtype=torch.float, requires_grad=True)
     follower.k_torch = torch.tensor( follower.k, dtype=torch.float, requires_grad = True )
     
-def compute_A1_b1_tensor(robotsJ, robotsK, robotsJ_state, robotsK_state):
+def compute_A1_b1_tensor(robotsJ, robotsK, robotsJ_state, robotsK_state, t, noise):
     
-    x_dot_k_mean, x_dot_k_cov = robotsK.predict_function(t)
+    x_dot_k_mean, x_dot_k_cov = traced_leader_predict_jit( t, noise )
     # print(f"gp mean: { x_dot_k_mean }, actual_last_xdot: {robotsK.Xdots[:,-1]}")
         
     x_dot_k = x_dot_k_mean.T.reshape(-1,1) #+ cov terms?? 
@@ -179,33 +183,6 @@ def get_future_reward( follower, leader, t = 0, noise = torch.tensor(0) ):
         tp = tp + dt_outer
 
     return reward
-
-
-def leader_motion_predict(t):
-    uL = 0.5
-    vL = 3*np.sin(np.pi*t*4) #  0.1 # 1.2
-    # uL = 1
-    # vL = 1
-    return uL, vL
-
-def leader_motion(t, noise = 0.0):
-    # uL = 0.5 + 0.5
-    # vL = 3*np.sin(np.pi*t*4) + 2.0 * np.sin(np.pi*t*4) + 0.1#  0.1 # 1.2
-    uL = 0.5 + 0.5
-    vL = 3*np.sin(np.pi*t*4) + 0.5#  0.1 # 1.2
-    
-    # uL = 1
-    # vL = 1
-    return uL, vL
-
-def leader_predict(t, noise = 0.0):
-    uL, vL = leader_motion_predict(t)
-    # print("noise", noise)
-    mu = torch.tensor([[uL, vL]], dtype=torch.float)
-    cov = torch.zeros((2,2), dtype=torch.float)
-    cov[0,0] = noise
-    cov[1,1] = noise
-    return mu, cov
         
 ################################################################
 
@@ -226,7 +203,7 @@ dt_outer = 0.05 #0.1
 alpha_cbf = 1.0#0.1 # 0.5   # Initial CBF
 k_clf = 1
 num_robots = 1
-lr_alpha = 0.05
+lr_alpha = 0.1 #0.05
 max_history = 100
 print_status = False
 
@@ -265,7 +242,7 @@ ax.set_ylabel("Y")
 ax.set_aspect(1)
 
 follower = Unicycle(follower_init_pose, dt_inner, ax, num_robots=num_robots, id = 0, min_D = d_min, max_D = d_max, FoV_angle = angle_max, color='g',palpha=1.0, alpha=alpha_cbf, k = k_clf, num_alpha = 3 )
-leader = SingleIntegrator2D(leader_init_pose, dt_inner, ax, color='r',palpha=1.0, target = 0, predict_function = lambda a: leader_predict(a, noise = noise) )
+leader = SingleIntegrator2D(leader_init_pose, dt_inner, ax, color='r',palpha=1.0, target = 0 )
 
 # print("kkk: ", follower.ks)
 
@@ -295,7 +272,7 @@ with writer.saving(fig, adapt_no_noise_movie_name, 100):
             # implement controller
             initialize_tensors(follower, leader)
             u_ref = unicycle_nominal_input_tensor_jit( follower.X_torch, leader.X_torch )
-            A, B = compute_A1_b1_tensor( follower, leader, follower.X_torch, leader.X_torch )
+            A, B = compute_A1_b1_tensor( follower, leader, follower.X_torch, leader.X_torch, torch.tensor(t), torch.tensor(noise) )
             solution,  = cbf_controller_layer( u_ref, A, B )
             # print("u_follower",u_follower)
             follower.step(solution.detach().numpy(), dt_inner)
@@ -343,18 +320,16 @@ with writer.saving(fig, adapt_no_noise_movie_name, 100):
             reward.backward(retain_graph=True)
             # print(f"Backward time: {time.time()-t0}")
             # Get grads
-            alpha_grad = getGrad( follower.alpha_torch )
-            alpha_grad = np.clip( alpha_grad, -0.1, 0.1 )
+            alpha_grad = getGrad( follower.alpha_torch, l_bound = -0.1, u_bound = 0.1 )
                     
-            k_grad = getGrad( follower.k_torch )
-            k_grad = np.clip( k_grad, -0.1, 0.1 )
+            k_grad = getGrad( follower.k_torch, l_bound = -0.1, u_bound = 0.1 )
             
             print(f"grads: alpha:{ alpha_grad.T }, k:{ k_grad }")
             # if abs(alpha_grad)>0.1:
             #     alpha_grad = np.sign(alpha_grad) * 0.3
             # print("alpha grad", alpha_grad)
             follower.alpha = np.clip( follower.alpha - lr_alpha * alpha_grad.reshape(-1,1), 0.0, None )
-            follower.k = follower.k - lr_alpha * k_grad
+            follower.k = np.clip(follower.k - lr_alpha * k_grad, 0.0, None )
             follower.alphas = np.append( follower.alphas, follower.alpha, axis=1 )
             follower.ks = np.append( follower.ks, follower.k )
             # print("follower alpha", follower.alpha)

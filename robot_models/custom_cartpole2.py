@@ -164,10 +164,10 @@ class CustomCartPoleEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
             theta = self.clip_theta(theta + self.tau * theta_dot)
             
         if x > self.x_threshold:
-            x = 0
+            x = self.x_threshold
         elif x < -self.x_threshold:
-            x = 0
-                        
+            x = -self.x_threshold
+            
         # print(f"pos: {x}, theta:{theta}")
 
         self.state = (x, x_dot, theta, theta_dot)
@@ -255,7 +255,7 @@ class CustomCartPoleEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         )  # default high
         self.state = self.np_random.uniform(low=low, high=high, size=(4,))
         self.state[2] = np.pi 
-        self.state[0] = - self.x_threshold + 0.2
+        self.state[0] = 0.0 #- self.x_threshold + 0.2
         self.steps_beyond_terminated = None
 
         if self.render_mode == "human":
