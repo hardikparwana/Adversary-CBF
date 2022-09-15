@@ -23,6 +23,8 @@ class Unicycle:
         
         self.X_torch = []
         
+        
+        
         self.U = np.array([0,0]).reshape(-1,1)
         self.x_dot_nominal = np.array([ [0],[0],[0] ])
         self.U_ref = np.array([0,0]).reshape(-1,1)
@@ -63,6 +65,12 @@ class Unicycle:
         self.k = k
         self.k_torch = torch.tensor( k, dtype=torch.float, requires_grad=True )
         
+        self.ks = np.copy(self.k)
+        self.alphas = np.copy(self.alpha)
+        
+        self.ks_u = np.copy(self.k)
+        self.alphas_u = np.copy(self.alpha)
+        
         # for Trust computation
         self.adv_alpha =  alpha*np.ones((1,num_adversaries))# alpha*np.ones((1,num_adversaries))
         self.trust_adv = np.ones((1,num_adversaries))
@@ -81,21 +89,9 @@ class Unicycle:
         # self.adv_objective = [0] * num_adversaries
         # self.robot_objective = [0] * num_robots
         
-        num_constraints1  = num_robots - 1 + num_adversaries
-        self.A1 = np.zeros((num_constraints1,2))
-        self.b1 = np.zeros((num_constraints1,1))
-        self.A2 = np.zeros((num_constraints1,2))
-        self.b2 = np.zeros((num_constraints1,1))
         
         # For plotting
-        self.alphas = np.copy(self.alpha)
-        self.ks = np.copy(self.k)
-        self.adv_alphas = alpha*np.ones((1,num_adversaries))
-        self.trust_advs = np.ones((1,num_adversaries))
-        self.robot_alphas = alpha*np.ones((1,num_robots))
-        self.trust_robots = 1*np.ones((1,num_robots))
-        self.adv_hs = np.ones((1,num_adversaries))
-        self.robot_hs = np.ones((1,num_robots))
+
         
         ## Store state
         self.X_org = np.copy(self.X)

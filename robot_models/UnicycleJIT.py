@@ -119,6 +119,32 @@ def unicycle_SI2D_fov_barrier_jit(X, targetX):
     
     return h1, dh1_dxi, dh1_dxj, h2, dh2_dxi, dh2_dxj, h3, dh3_dxi, dh3_dxj
 
+def unicycle_SI2D_fov_barrier(X, targetX):
+    
+    # print(f"X:{X}, targetX:{targetX}")
+    
+    max_D = 2.0
+    min_D = 0.3
+    FoV_angle = 3.14157/3
+    
+    # Max distance
+    h1 = max_D**2 - np.linalg.norm( X[0:2] - targetX[0:2] )**2
+    
+    # Min distance
+    h2 = np.linalg.norm( X[0:2] - targetX[0:2] )**2 - min_D**2
+ 
+    # Max angle
+    p = targetX[0:2] - X[0:2]
+
+    # dir_vector = torch.tensor([[torch.cos(x[2,0])],[torch.sin(x[2,0])]]) # column vector
+    dir_vector = np.append( np.cos(X[2,0]).reshape(-1,1), np.sin(X[2,0]).reshape(-1,1) , axis = 0 )
+    bearing_angle  = dir_vector.T @ p / np.linalg.norm(p)
+    h3 = (bearing_angle - np.cos(FoV_angle/2))/(1.0-np.cos(FoV_angle/2))
+    if h3 < 0:
+        print("ERROR!!!!")
+    
+    return h1, h2, h3[0,0]
+
 @torch.jit.script
 def unicycle_compute_reward_jit(X,targetX):
     

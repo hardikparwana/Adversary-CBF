@@ -387,7 +387,7 @@ def get_state_dot_noisy_torch(X, action, polemass_length, gravity, length, massp
     error_square = torch.square(X_dot/2)
     cov = torch.diag( error_square[:,0] )
     # cov = torch.zeros((4,4))
-    X_dot = X_dot #+ X_dot/2 #X_dot = X_dot + X_dot/6
+    X_dot = X_dot + X_dot/3 #X_dot = X_dot + X_dot/6
     return X_dot, cov
     
     

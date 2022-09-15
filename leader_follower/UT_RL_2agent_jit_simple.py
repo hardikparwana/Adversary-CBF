@@ -91,7 +91,7 @@ def compute_A1_b1_tensor(robotsJ, robotsK, robotsJ_state, robotsK_state, t, nois
 first_run = True
 first_generate_sigma_run = True
     
-def get_future_reward( follower, leader, t = 0, noise = torch.tensor(0) ):
+def get_future_reward( follower, leader, t = 0, noise = torch.tensor(0), enforce_input_constraints = False ):
     # Initialize sigma points for other robots
     follower_states = [torch.clone(follower.X_torch)]        
     prior_leader_states, prior_leader_weights = initialize_sigma_points2_JIT(leader.X_torch)
@@ -131,27 +131,28 @@ def get_future_reward( follower, leader, t = 0, noise = torch.tensor(0) ):
         solution, deltas = cbf_controller_layer( u_ref, A, B )
         # print("solution", solution)
         # print(f"Time 5: {time.time()-t0}")
-        if np.any( deltas.detach().numpy() > 0.01 ):
-            # cannot satisfy with input constraints
-            improve_constraints.append( -B[0] ) # increase B. reduce -B
-            improve_constraints.append( -B[1] ) # increase B. reduce -B
-            improve_constraints.append( -B[2] ) # increase B. reduce -B
-            improve_constraints.append( -B[3] ) # increase B. reduce -B
-            if deltas[0,0] > 0.01:
-                 improve_constraints.append( deltas[0,0] )
-            if deltas[1,0] > 0.01:
-                 improve_constraints.append( deltas[1,0] )
-            print(f"Infeasible solution found at :{i}. Will improve first")
-            # exit()
-            return maintain_constraints, improve_constraints, False, reward
-        else:
-            temp = A @ solution + B
-            # maintain_constraints.append(temp[0] + 0.01)
-            maintain_constraints.append(temp[1] + 0.01)
-            maintain_constraints.append(temp[2] + 0.01)
-            maintain_constraints.append(temp[3] + 0.01)
-            # if np.any( temp[1:].detach().numpy() < 0 ):
-            #     print("Issue here")
+        if enforce_input_constraints:
+            if np.any( deltas.detach().numpy() > 0.01 ):
+                # cannot satisfy with input constraints
+                improve_constraints.append( -B[0] ) # increase B. reduce -B
+                improve_constraints.append( -B[1] ) # increase B. reduce -B
+                improve_constraints.append( -B[2] ) # increase B. reduce -B
+                improve_constraints.append( -B[3] ) # increase B. reduce -B
+                if deltas[0,0] > 0.01:
+                    improve_constraints.append( deltas[0,0] )
+                if deltas[1,0] > 0.01:
+                    improve_constraints.append( deltas[1,0] )
+                print(f"Infeasible solution found at :{i}. Will improve first")
+                # exit()
+                return maintain_constraints, improve_constraints, False, reward
+            else:
+                temp = A @ solution + B
+                # maintain_constraints.append(temp[0] + 0.01)
+                maintain_constraints.append(temp[1] + 0.01)
+                maintain_constraints.append(temp[2] + 0.01)
+                maintain_constraints.append(temp[3] + 0.01)
+                # if np.any( temp[1:].detach().numpy() < 0 ):
+                #     print("Issue here")
             
         follower_states.append( follower.step_torch( follower_states[i], solution, dt_outer ) )        
         leader_next_state_expanded = leader_states_expanded + leader_xdot_states * dt_outer
@@ -173,7 +174,7 @@ def get_future_reward( follower, leader, t = 0, noise = torch.tensor(0) ):
 ################################################################
 
 # Sim Parameters
-num_steps = 100#50 #100 #200 #200
+num_steps = 10#50#20#100#50 #100 #200 #200
 learn_period = 1#2
 gp_training_iter_init = 30
 train_gp = False
@@ -182,7 +183,7 @@ H = 30# 5
 gp_training_iter = 10
 d_min = 0.3
 d_max = 2.0
-angle_max = np.pi/2
+angle_max = np.pi/3
 num_points = 5
 dt_inner = 0.05
 dt_outer = 0.05 #0.1
@@ -265,7 +266,7 @@ def constrained_update( objective, maintain_constraints, improve_constraints, pa
     
 
 
-def simulate_scenario(movie_name = 'test.mp4', adapt = False, noise = 0.1):
+def simulate_scenario(movie_name = 'test.mp4', adapt = False, noise = 0.1, enforce_input_constraints = False):
 
     t = 0
     first_time = True
@@ -285,12 +286,8 @@ def simulate_scenario(movie_name = 'test.mp4', adapt = False, noise = 0.1):
     writer = FFMpegWriter(fps=15, metadata=metadata)
 
     step_rewards_adapt = []
-    gp_pred_x_adapt = []
-    gp_pred_y_adapt = []
-    true_x_adapt = []
-    true_y_adapt = []
-    gp_pred_x_cov_adapt = []
-    gp_pred_y_cov_adapt = []
+    follower.states_array = np.copy( follower.X )
+    leader.states_array = np.copy( leader.X )
 
     with writer.saving(fig, movie_name, 100): 
 
@@ -308,12 +305,18 @@ def simulate_scenario(movie_name = 'test.mp4', adapt = False, noise = 0.1):
                 initialize_tensors(follower, leader)
                 u_ref = unicycle_nominal_input_tensor_jit( follower.X_torch, leader.X_torch )
                 A, B = compute_A1_b1_tensor( follower, leader, follower.X_torch, leader.X_torch, torch.tensor(t), torch.tensor(noise) )
+                
                 solution, deltas = cbf_controller_layer( u_ref, A, B )
+                if np.any( deltas.detach().numpy() > 0.01 ) and enforce_input_constraints:
+                    print("Solution failed")
+                    return fig, ax, follower, leader, step_rewards_adapt
                 # print(f"u_follower:{solution}")
                 follower.step(solution.detach().numpy(), dt_inner)
+                follower.ks_u = np.append( follower.ks_u, follower.k )
+                follower.alphas_u = np.append( follower.alphas_u, follower.alpha, axis=1 )
                 
                 # print(f"reward computation: f:{ follower.X.T }, L:{leader.X.T}")
-                step_rewards_adapt.append( follower.lyapunov(follower.X, leader.X) )
+                step_rewards_adapt.append( unicycle_compute_reward_jit(torch.tensor(follower.X),torch.tensor(leader.X)).detach().numpy()[0,0] )
                 
                 t = t + dt_inner
                 
@@ -333,15 +336,15 @@ def simulate_scenario(movie_name = 'test.mp4', adapt = False, noise = 0.1):
                     
                     success = False
                     while not success:
-                        maintain_constraints, improve_constraints, success, reward = get_future_reward( follower, leader, t = t, noise = torch.tensor(noise))
+                        maintain_constraints, improve_constraints, success, reward = get_future_reward( follower, leader, t = t, noise = torch.tensor(noise), enforce_input_constraints = enforce_input_constraints)                    
                         grads = constrained_update( reward, maintain_constraints, improve_constraints, [follower.k_torch, follower.alpha_torch] )
                         
                         grads = np.clip( grads, -2.0, 2.0 )
                         follower.k = np.clip(follower.k + lr_alpha * grads[0], 0.0, None )
                         follower.alpha = np.clip( follower.alpha + lr_alpha * grads[1:].reshape(-1,1), 0.0, None )
                         print(f"follower k:{follower.k}, alpha:{follower.alpha.T}")
-                        # follower.ks = np.append( follower.ks, follower.k )
-                        # follower.alphas = np.append( follower.alphas, follower.alpha, axis=1 )
+                        follower.ks = np.append( follower.ks, follower.k )
+                        follower.alphas = np.append( follower.alphas, follower.alpha, axis=1 )
                         initialize_tensors(follower, leader)
                     print("Successfully made it feasible")      
                     # exit()     
@@ -366,12 +369,109 @@ def simulate_scenario(movie_name = 'test.mp4', adapt = False, noise = 0.1):
             writer.grab_frame()
            
     # return data for plotting 
-    return fig, ax
+    return fig, ax, follower, leader, step_rewards_adapt
   
 ## Without noise: perfect knowledge??
 
 noise  = 1.0 #0.5
+save_plot = True
 
-fig, ax = simulate_scenario( movie_name = 'adapt.mp4', adapt = True, noise = 0.0 )  
+fig1, ax1, follower1, leader1, rewards1 = simulate_scenario( movie_name = 'test.mp4', adapt = False, noise = 0.0, enforce_input_constraints=False )  
+fig2, ax2, follower2, leader2, rewards2 = simulate_scenario( movie_name = 'test.mp4', adapt = True, noise = 0.0, enforce_input_constraints=False )  
+fig3, ax3, follower3, leader3, rewards3 = simulate_scenario( movie_name = 'test.mp4', adapt = False, noise = 0.0, enforce_input_constraints=True )
+fig4, ax4, follower4, leader4, rewards4 = simulate_scenario( movie_name = 'test.mp4', adapt = True, noise = 0.0, enforce_input_constraints=True )
   
 plt.ioff()
+
+h11 = []; h21 = []
+h12 = []; h22 = []
+h13 = []; h23 = []
+
+def get_barriers( follower, leader ):
+    h1s = []; h2s = []; h3s = []
+    for i in range( follower.Xs.shape[1] ):
+        h1, h2, h3 = unicycle_SI2D_fov_barrier( follower.Xs[:,i].reshape(-1,1), leader.Xs[:,i].reshape(-1,1) )
+        h1s.append(h1); h2s.append(h2); h3s.append(h3)
+    tp = np.linspace( 0, dt_inner * follower.Xs.shape[1], follower.Xs.shape[1]  )
+    return tp, h1s, h2s, h3s
+    
+tp1, h11, h12, h13 = get_barriers( follower1, leader1 )    
+tp2, h21, h22, h23 = get_barriers( follower2, leader2 )
+tp3, h31, h32, h33 = get_barriers( follower3, leader3 )
+tp4, h41, h42, h43 = get_barriers( follower4, leader4 )
+    
+   
+# Plot
+
+print("Plotting now")
+
+figure1, axis1 = plt.subplots( 1 , 1)
+axis1.plot(tp1,h11,'r',label='Unbounded - Fixed', alpha = 0.3)
+axis1.plot(tp2,h21,'r.',label='Unbounded - Adaptive')
+axis1.plot(tp3,h31,'r--',label='Bounded - Fixed')
+axis1.plot(tp4,h41,'r',label='Bounded - Adapt')
+
+axis1.plot(tp1,h12,'g',label='Unbounded - Fixed', alpha = 0.3)
+axis1.plot(tp2,h22,'g.',label='Unbounded - Adaptive')
+axis1.plot(tp3,h32,'g--',label='Bounded - Fixed')
+axis1.plot(tp4,h42,'g',label='Bounded - Adapt')
+
+axis1.plot(tp1,h13,'k',label='Unbounded - Fixed', alpha = 0.3)
+axis1.plot(tp2,h23,'k.',label='Unbounded - Adaptive')
+axis1.plot(tp3,h33,'k--',label='Bounded - Fixed')
+axis1.plot(tp4,h43,'k',label='Bounded - Adapt')
+
+# axis1.set_title('Follower barriers 1 alphas')
+axis1.set_xlabel('time (s)')
+axis1.legend()
+
+
+figure2, axis2 = plt.subplots( 2 , 1)
+axis2[0].plot(tp1,follower1.Us[0,:],'r',label='Unbounded - Fixed', alpha = 0.3)
+axis2[0].plot(tp2,follower2.Us[0,:],'r.',label='Unbounded - Adaptive')
+axis2[0].plot(tp3,follower3.Us[0,:],'r--',label='Bounded - Fixed')
+axis2[0].plot(tp4,follower4.Us[0,:],'r',label='Bounded - Adapt')
+axis2[0].set_ylabel('u')
+
+axis2[1].plot(tp1,follower1.Us[1,:],'r',label='Unbounded - Fixed', alpha = 0.3)
+axis2[1].plot(tp2,follower2.Us[1,:],'r.',label='Unbounded - Adaptive')
+axis2[1].plot(tp3,follower3.Us[1,:],'r--',label='Bounded - Fixed')
+axis2[1].plot(tp4,follower4.Us[1,:],'r',label='Bounded - Adapt')
+axis2[1].set_ylabel(r'\omega')
+
+# axis1.set_title('Follower barriers 1 alphas')
+axis2[1].set_xlabel('time (s)')
+axis2[0].legend()
+axis2[1].legend()
+
+figure3, axis3 = plt.subplots( 1 , 1)
+tp1 = np.linspace( 0, dt_inner * len(rewards1), len(rewards1)  )
+tp2 = np.linspace( 0, dt_inner * len(rewards2), len(rewards2)  )
+tp3 = np.linspace( 0, dt_inner * len(rewards3), len(rewards3)  )
+tp4 = np.linspace( 0, dt_inner * len(rewards4), len(rewards4)  )
+axis3.plot(tp1,rewards1,'k',label='Unbounded - Fixed', alpha = 1.0)
+axis3.plot(tp2,rewards2,'r',label='Unbounded - Adaptive', alpha = 1.0)
+axis3.plot(tp3,rewards3,'g',label='Bounded - Fixed', alpha = 1.0)
+axis3.plot(tp4,rewards4,'c',label='Bounded - Adapt', alpha = 1.0)
+
+if save_plot:
+    figure1.savefig("barriers.eps")
+    figure1.savefig("barriers.png")
+    figure2.savefig("control.eps")
+    figure2.savefig("control.png")
+    figure2.savefig("rewards.eps")
+    figure2.savefig("rewards.png")
+   
+    
+plt.show()
+
+# figure1, axis1 = plt.subplots(2, 2)
+# axis1[0,0].plot(tp,robots[0].adv_alphas[1:,0],'r',label='Adversary')
+# axis1[0,0].plot(tp,robots[0].robot_alphas[1:,1],'g',label='Robot 2')
+# axis1[0,0].plot(tp,robots[0].robot_alphas[1:,2],'k',label='Robot 3')
+# axis1[0,0].set_title('Robot 1 alphas')
+# axis1[0,0].set_xlabel('time (s)')
+# axis1[0,0].legend()
+
+# axis4.set_rasterization_zorder(1)
+# figure4.savefig("new_trajectory.eps", dpi=50, rasterized=True)
