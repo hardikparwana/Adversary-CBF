@@ -174,7 +174,7 @@ def get_future_reward( follower, leader, t = 0, noise = torch.tensor(0), enforce
 ################################################################
 
 # Sim Parameters
-num_steps = 10#50#20#100#50 #100 #200 #200
+num_steps = 300#100#50#20#100#50 #100 #200 #200
 learn_period = 1#2
 gp_training_iter_init = 30
 train_gp = False
@@ -185,7 +185,7 @@ d_min = 0.3
 d_max = 2.0
 angle_max = np.pi/3
 num_points = 5
-dt_inner = 0.05
+dt_inner = 0.01
 dt_outer = 0.05 #0.1
 alpha_cbf = 0.3 #1.0#0.1 # 0.5   # Initial CBF
 k_clf = 1
@@ -254,14 +254,17 @@ def constrained_update( objective, maintain_constraints, improve_constraints, pa
             print("Cannot Find feasible direction")
             exit()
         
-        print("update direction: ", d.value.T)
+        # print("update direction: ", d.value.T)
         
         return d.value
     
     else:
-        obj = cp.Maximize( improve_constraint_direction @ d )
-        print("update direction: ", -improve_constraint_direction.reshape(-1,1).T)
-        return -improve_constraint_direction.reshape(-1,1)
+        if len( improve_constraints ) > 0:
+            obj = cp.Maximize( improve_constraint_direction @ d )
+            # print("update direction: ", -improve_constraint_direction.reshape(-1,1).T)
+            return -improve_constraint_direction.reshape(-1,1)
+        else:
+            return -objective_grad.reshape(-1,1)
         
     
 
@@ -346,7 +349,7 @@ def simulate_scenario(movie_name = 'test.mp4', adapt = False, noise = 0.1, enfor
                         follower.ks = np.append( follower.ks, follower.k )
                         follower.alphas = np.append( follower.alphas, follower.alpha, axis=1 )
                         initialize_tensors(follower, leader)
-                    print("Successfully made it feasible")      
+                    # print("Successfully made it feasible")      
                     # exit()     
                         
                     
@@ -459,8 +462,8 @@ if save_plot:
     figure1.savefig("barriers.png")
     figure2.savefig("control.eps")
     figure2.savefig("control.png")
-    figure2.savefig("rewards.eps")
-    figure2.savefig("rewards.png")
+    figure3.savefig("rewards.eps")
+    figure3.savefig("rewards.png")
    
     
 plt.show()

@@ -175,7 +175,7 @@ def generate_psd_params():
 # Set up environment
 env_to_render = CustomCartPoleEnv(render_mode="rgb_array")
 # env = env_to_render #RecordVideo( env_to_render, video_folder="/home/hardik/Desktop/", name_prefix="Excartpole" )
-env = RecordVideo( env_to_render, video_folder="/home/hardik/Desktop/", name_prefix="ExcartpoleSimple_constrained2_more_bias" )
+env = RecordVideo( env_to_render, video_folder="/home/hardik/Desktop/", name_prefix="ExcartpoleSimple_constrained2_morebias_plot" )
 observation, info = env.reset(seed=42)
 
 polemass_length, gravity, length, masspole, total_mass, tau = torch.tensor(env.polemass_length), torch.tensor(env.gravity), torch.tensor(env.length), torch.tensor(env.masspole), torch.tensor(env.total_mass), torch.tensor(env.tau)
@@ -209,7 +209,10 @@ initialize_tensors( env, param_w, param_mu, param_Sigma )
 # print(f"s:{param_Sigma}, t:{torch.diag(param_Sigma)}")
 # exit()
 
-plt.ion()
+# plt.ion()
+
+Xs = np.copy(env.get_state())
+Us = []
 
 for i in range(800): #300
     
@@ -231,6 +234,10 @@ for i in range(800): #300
             # exit()
         print("action", action)
         observation, reward, terminated, truncated, info = env.step(action.item())
+        
+        Xs = np.append( Xs, env.get_state(), axis = 1 )
+        Us.append(action.item())
+        
         env.render()
         
         # Get training data fro GP
@@ -279,6 +286,17 @@ for i in range(800): #300
         # if np.abs(np.linalg.det(Sigma))<0.01:
         #     print("*** ERROR******: wrong covariance matrix")
     
+tp1 = np.linspace( 0, dt_inner * Xs.shape[1], Xs.shape[1]  )
+figure1, axis1 = plt.subplots( 1 , 1)
+axis1.plot( tp1, Xs[0,:], 'k', label='Cart Position' )
+axis1.plot( tp1, Xs[1,:], 'r', label='Cart Velocity' )
+axis1.plot( tp1, Xs[2,:], 'g', label='Pole angle' )
+axis1.plot( tp1, Xs[3,:], 'c', label='Pole  velocity' )
+
+if True:
+    figure1.savefig("cartpole_states.eps")
+    figure1.savefig("cartpole_states.png")
+
         
 # env.close_video_recorder()
 env.close()

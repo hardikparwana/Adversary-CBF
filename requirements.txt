@@ -26,17 +26,23 @@ backcall==0.2.0
 beautifulsoup4==4.11.1
 black==22.6.0
 bleach==5.0.1
+boto3==1.24.70
+botocore==1.27.70
+Box2D==2.3.10
 cachetools==5.2.0
+cartpole==0.0.1
 certifi==2022.6.15
 cffi==1.15.1
 charset-normalizer==2.1.0
 click==8.1.3
+cloudpickle==2.2.0
+colabgymrender==1.1.0
 context-var==0.1.1
 cvxpy==1.2.0
 cvxpylayers==0.1.5
 cycler==0.11.0
 debugpy==1.6.0
-decorator==5.1.1
+decorator==4.4.2
 defusedxml==0.7.1
 demo-nodes-py==0.9.3
 diffcp==1.0.19
@@ -65,7 +71,12 @@ google-auth-oauthlib==0.4.6
 gpytorch==1.8.1
 grpcio==1.47.0
 gurobipy==9.5.1
+gym==0.26.0
+gym-notices==0.0.8
+gym-recording==0.0.1
 idna==3.3
+imageio==2.21.2
+imageio-ffmpeg==0.4.7
 importlib-metadata==4.12.0
 importlib-resources==5.8.0
 iniconfig==1.1.1
@@ -77,6 +88,7 @@ isort==5.10.1
 iterextras==0.2.1
 jedi==0.18.1
 Jinja2==3.1.2
+jmespath==1.0.1
 joblib==1.1.0
 jsonschema==4.6.1
 jupyter-client==7.3.4
@@ -91,6 +103,7 @@ launch-xml==0.10.8
 launch-yaml==0.10.8
 lazy-object-proxy==1.7.1
 libcst==0.4.7
+lltm-cpp==0.0.0
 llvmlite==0.39.0
 loguru==0.6.0
 Markdown==3.4.1
@@ -99,6 +112,7 @@ matplotlib==3.5.1
 matplotlib-inline==0.1.3
 mccabe==0.7.0
 mistune==0.8.4
+moviepy==1.0.3
 multidict==6.0.2
 mypy-extensions==0.4.3
 nbclient==0.6.6
@@ -123,6 +137,7 @@ pickleshare==0.7.5
 Pillow==9.0.1
 platformdirs==2.5.2
 pluggy==1.0.0
+proglog==0.1.10
 prometheus-client==0.14.1
 promise==2.3
 prompt-toolkit==3.0.30
@@ -136,6 +151,7 @@ pyasn1-modules==0.2.8
 pybind11==2.9.2
 pycparser==2.21
 pyDeprecate==0.3.2
+pygame==2.1.2
 Pygments==2.12.0
 pylint==2.14.5
 pyparsing==3.0.7
@@ -182,6 +198,7 @@ rqt-srv==1.0.3
 rqt-top==1.0.2
 rqt-topic==1.2.2
 rsa==4.9
+s3transfer==0.6.0
 scikit-learn==1.0.2
 scipy==1.8.0
 scs==3.2.0
@@ -207,9 +224,10 @@ tinycss2==1.1.1
 tomli==2.0.1
 tomlkit==0.11.4
 topic-monitor==0.9.3
-torch==1.12.0
+torch==1.12.1
 torchmetrics==0.9.3
 torchquad==0.3.0
+torchvision==0.13.1
 tornado==6.2
 tqdm==4.64.0
 traitlets==5.3.0

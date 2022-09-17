@@ -86,7 +86,7 @@ class CustomCartPoleEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         # Angle at which to fail the episode
         self.theta_threshold_radians = 12 * 2 * math.pi / 360
         # self.x_threshold = 2.4
-        self.x_threshold = 7.0 #5.0
+        self.x_threshold = 2.0 #7.0 #5.0
 
         # Angle limit set to 2 * theta_threshold_radians so failing observation
         # is still within bounds.

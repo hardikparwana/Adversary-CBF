@@ -171,7 +171,10 @@ def cbf_condition_evaluator_unicycle_SI2D( robotJ_state, robotK_state, robotK_st
 
 # @torch.jit.script
 def unicycle_SI2D_cbf_fov_condition_evaluator( robotJ_state, robotK_state, robotK_state_dot, alpha_torch):
-    h1, dh1_dxj, dh1_dxk, h2, dh2_dxj, dh2_dxk, h3, dh3_dxj, dh3_dxk = unicycle_SI2D_fov_barrier_jit(robotJ_state, robotK_state)    
+    h1, dh1_dxj, dh1_dxk, h2, dh2_dxj, dh2_dxk, h3, dh3_dxj, dh3_dxk = unicycle_SI2D_fov_barrier_jit(robotJ_state, robotK_state)   
+    
+    # if h1<0 or h2<0 or h3<0:
+    #     print(f"ERROR*********:{h1}, :{h2}, {h3}") 
     
     B1 = dh1_dxj @ unicycle_f_torch_jit( robotJ_state ) + dh1_dxk @ robotK_state_dot + alpha_torch[0] * h1
     A1 = dh1_dxj @ unicycle_g_torch_jit( robotJ_state ) 
