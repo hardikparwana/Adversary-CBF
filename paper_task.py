@@ -21,10 +21,10 @@ d_min = 1.0#0.1
 h_min = 1.0##0.4   # more than this and do not decrease alpha
 min_dist = 1.0 # 0.1#0.05  # less than this and dercrease alpha
 cbf_extra_bad = 0.0
-update_param = True
+update_param = False #True
 
-alpha_cbf = 0.7#1.4#0.8
-alpha_der_max = 0.5#1.0#0.5
+alpha_cbf = 0.7 #0.9#1.4#0.8
+alpha_der_max = 0.1 #0.5#1.0#0.5
 
 # Plot                  
 plt.ion()
@@ -34,25 +34,24 @@ ax.set_xlabel("X")
 ax.set_ylabel("Y")
 # ax.set_aspect(1)
 
-
 num_adversaries = 3
 alpha = 0.1
 
-default_plot = True
+default_plot = False
 save_plot = False
 movie_name = 'test0_default.mp4'
 
 # agents
 robots = []
 num_robots = 3
-robots.append( Unicycle(np.array([3,1.5,np.pi/2]), dt, ax, num_robots=num_robots, id = 0, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries ) )
-robots.append( Unicycle(np.array([2.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries ) )
-robots.append( Unicycle(np.array([3.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 2, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries ) )
+robots.append( Unicycle(np.array([3,1.5,np.pi/2]), dt, ax, num_robots=num_robots, id = 0, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, num_connectivity = 0 ) )
+robots.append( Unicycle(np.array([2.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, num_connectivity = 0 ) )
+robots.append( Unicycle(np.array([3.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 2, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, num_connectivity = 0 ) )
 
 robots_default = []
-robots_default.append( Unicycle(np.array([3,1.5,np.pi/2]), dt, ax, num_robots=num_robots, id = 0, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, plot=default_plot ) )
-robots_default.append( Unicycle(np.array([2.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, plot=default_plot ) )
-robots_default.append( Unicycle(np.array([3.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 2, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, plot=default_plot ) )
+robots_default.append( Unicycle(np.array([3,1.5,np.pi/2]), dt, ax, num_robots=num_robots, id = 0, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, plot=default_plot, num_connectivity = 0 ) )
+robots_default.append( Unicycle(np.array([2.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, plot=default_plot, num_connectivity = 0 ) )
+robots_default.append( Unicycle(np.array([3.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 2, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, plot=default_plot, num_connectivity = 0 ) )
 
 # agent nominal version
 robots_nominal = []
@@ -116,6 +115,8 @@ num_constraints2 = num_robots - 1 + num_adversaries
 A2 = cp.Parameter((num_constraints2,2),value=np.zeros((num_constraints2,2)))
 b2 = cp.Parameter((num_constraints2,1),value=np.zeros((num_constraints2,1)))
 const2 = [A2 @ u2 <= b2]
+const2 += [ cp.abs( u2[0,0] ) <= 4.0 ]
+const2 += [ cp.abs( u2[1,0] ) <= 4.0 ]
 objective2 = cp.Minimize( Q2 @ u2 )
 best_controller = cp.Problem( objective2, const2 )
 
@@ -288,8 +289,8 @@ with writer.saving(fig, movie_name, 100):
             
             if update_param:
                 for k in range(num_adversaries):
-                    Q2 = robots[j].adv_objective[k]
-                    best_controller.solve(solver=cp.GUROBI)
+                    Q2.value = robots[j].adv_objective[k]
+                    best_controller.solve(solver=cp.GUROBI, verbose=True)
                     if best_controller.status!='optimal':
                         print(f"LP status:{best_controller.status}")
                                 
@@ -307,12 +308,11 @@ with writer.saving(fig, movie_name, 100):
                     if (robots[j].adv_alpha[0,k]<0):
                         robots[j].adv_alpha[0,k] = 0.01
                     
-                    
                 for k in range(num_robots):
                     if k==j:
                         continue
                 
-                    Q2 = robots[j].robot_objective[k]
+                    Q2.value = robots[j].robot_objective[k]
                     best_controller.solve()
                     if best_controller.status!='optimal':
                         print(f"LP status:{best_controller.status}")
@@ -362,22 +362,25 @@ with writer.saving(fig, movie_name, 100):
             robots_default[j].adv_hs = np.append( robots_default[j].adv_hs, robots_default[j].adv_h, axis=0 )
             
             u1_ref.value = robots_default[j].U_ref
-            cbf_controller.solve(solver=cp.GUROBI) 
-            if cbf_controller.status!='optimal':
-                print(f"{j}'s input: {cbf_controller.status}")
-                # robots_default[j].nextU = robots_default[j].U_ref # TODO: take care of this
-                # A1_relaxed.value = A1.value
-                # b1_relaxed.value = b1.value
-                # u1_ref_relaxed.value = u1_ref.value
-                # cbf_controller_relaxed.solve(solver=cp.GUROBI)
-                # robots_default[j].nextU = u1_relaxed.value    
-                # if cbf_controller_relaxed.status!='optimal':
-                #     print(f"{j}'s input: {cbf_controller.status}")
-                #     exit()
-                # else:
-                #     print("USED relaxed Controller!!!!") # use the last solved value
-            else:
-                robots_default[j].nextU = u1.value   # use the last solved value
+            try:
+                cbf_controller.solve(solver=cp.GUROBI) 
+                if cbf_controller.status!='optimal':
+                    print(f"{j}'s input: {cbf_controller.status}")
+                    # robots_default[j].nextU = robots_default[j].U_ref # TODO: take care of this
+                    # A1_relaxed.value = A1.value
+                    # b1_relaxed.value = b1.value
+                    # u1_ref_relaxed.value = u1_ref.value
+                    # cbf_controller_relaxed.solve(solver=cp.GUROBI)
+                    # robots_default[j].nextU = u1_relaxed.value    
+                    # if cbf_controller_relaxed.status!='optimal':
+                    #     print(f"{j}'s input: {cbf_controller.status}")
+                    #     exit()
+                    # else:
+                    #     print("USED relaxed Controller!!!!") # use the last solved value
+                else:
+                    robots_default[j].nextU = robots_default[j].U #u1.value   # use the last solved value
+            except:
+                robots_default[j].nextU = robots_default[j].U
                 
             #######################################################################################################
             

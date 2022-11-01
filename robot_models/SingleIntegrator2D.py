@@ -2,7 +2,7 @@ import numpy as np
 
 class SingleIntegrator2D:
     
-    def __init__(self,X0,dt,ax,id=0,num_robots=1,num_adversaries = 1, alpha=0.8,color='r',palpha=1.0,plot=True):
+    def __init__(self,X0,dt,ax,id,num_robots=1,num_adversaries = 1, num_obstacles = 0, alpha=0.8,color='r',palpha=1.0,plot=True, num_connectivity = 1):
         '''
         X0: iniytial state
         dt: simulation time step
@@ -32,12 +32,19 @@ class SingleIntegrator2D:
          # for Trust computation
         self.adv_alpha =  alpha*np.ones((1,num_adversaries))# alpha*np.ones((1,num_adversaries))
         self.trust_adv = np.ones((1,num_adversaries))
+        self.obs_alpha =  alpha*np.ones((1,num_obstacles))#
+        self.trust_obs = np.ones((1,num_obstacles))
         self.robot_alpha = alpha*np.ones((1,num_robots))
         self.trust_robot = np.ones((1,num_robots))
         self.adv_objective = [0] * num_adversaries
         self.robot_objective = [0] * num_robots
+        self.obs_objective = [0] * num_obstacles
         self.robot_h = np.ones((1,num_robots))
-        self.adv_h = np.ones((1,num_adversaries))        
+        self.adv_h = np.ones((1,num_adversaries))
+        self.obs_h = np.ones((1,num_obstacles))
+        self.robot_connectivity_objective = 0
+        self.robot_connectivity_alpha = alpha*np.ones((1,1))
+        self.robot_connectivity_h = np.array([[1.0]])   
         
         # Old
         # for Trust computation
@@ -48,19 +55,25 @@ class SingleIntegrator2D:
         # self.adv_objective = [0] * num_adversaries
         # self.robot_objective = [0] * num_robots
         
-        num_constraints1  = num_robots - 1 + num_adversaries
+        num_constraints1  = num_robots - 1 + num_adversaries + num_obstacles + num_connectivity
         self.A1 = np.zeros((num_constraints1,2))
         self.b1 = np.zeros((num_constraints1,1))
+        self.slack_constraint = np.zeros((num_constraints1,1))
         
         # For plotting
         self.adv_alphas = alpha*np.ones((1,num_adversaries))
         self.trust_advs = np.ones((1,num_adversaries))
         self.robot_alphas = alpha*np.ones((1,num_robots))
         self.trust_robots = 1*np.ones((1,num_robots))
+        self.obs_alphas = alpha*np.ones((1,num_obstacles))
+        self.trust_obss = 1*np.ones((1,num_obstacles))
         self.Xs = X0.reshape(-1,1)
         self.Us = np.array([0,0]).reshape(-1,1)
         self.adv_hs = np.ones((1,num_adversaries))
         self.robot_hs = np.ones((1,num_robots))
+        self.obs_hs = np.ones((1,num_obstacles))
+        self.robot_connectivity_alphas = np.ones((1,1))
+        self.robot_connectivity_hs = np.ones((1,1))
         
         
     def f(self):
@@ -90,6 +103,10 @@ class SingleIntegrator2D:
         dV_dx = 2*( self.X - G[0:2] ).T
         return V, dV_dx
     
+    def nominal_input(self,G):
+        V, dV_dx = self.lyapunov(G.X)
+        return - 5.0 * dV_dx.reshape(-1,1)
+    
     def agent_barrier(self,agent,d_min):
         h = d_min**2 - np.linalg.norm(self.X - agent.X[0:2])**2
         dh_dxi = -2*( self.X - agent.X[0:2] ).T
@@ -98,5 +115,18 @@ class SingleIntegrator2D:
             dh_dxj = 2*( self.X - agent.X[0:2] ).T
         elif agent.type=='Unicycle':
             dh_dxj = np.append( -2*( self.X - agent.X[0:2] ).T, [[0]], axis=1 )
+        else:
+            dh_dxj = 2*( self.X - agent.X[0:2] ).T
         return h, dh_dxi, dh_dxj
     
+    def connectivity_barrier( self, agent, d_max ):
+        h = np.linalg.norm( self.X[0:2] - agent.X[0:2] )**2 - d_max**2
+        
+        dh_dxi = 2*( self.X[0:2] - agent.X[0:2] ).T
+        if agent.type == 'SingleIntegrator2D':
+            dh_dxj = -2*( self.X[0:2] - agent.X[0:2] ).T
+        elif agent.type == 'Unicycle':
+            dh_dxj = np.append( -2*( self.X[0:2] - agent.X[0:2] ).T, np.array([[0]]), axis = 1 )
+        else:
+            dh_dxj = -2*( self.X[0:2] - agent.X[0:2] ).T
+        return h.reshape(-1,1), dh_dxi, dh_dxj        

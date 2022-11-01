@@ -3,7 +3,7 @@ from utils.utils import wrap_angle
 
 class Unicycle:
     
-    def __init__(self,X0,dt,ax,id,num_robots=1,num_adversaries = 1, num_obstacles = 0, alpha=0.8,color='r',palpha=1.0,plot=True):
+    def __init__(self,X0,dt,ax,id,num_robots=1,num_adversaries = 1, num_obstacles = 0, alpha=0.8,color='r',palpha=1.0,plot=True, num_connectivity = 1):
         '''
         X0: iniytial state
         dt: simulation time step
@@ -44,6 +44,10 @@ class Unicycle:
         self.robot_h = np.ones((1,num_robots))
         self.adv_h = np.ones((1,num_adversaries))
         self.obs_h = np.ones((1,num_obstacles))
+        self.robot_connectivity_objective = 0
+        self.robot_connectivity_alpha = alpha*np.ones((1,1))
+        self.robot_connectivity_h = np.array([[1.0]])
+        
         
         # Old
         # self.adv_alpha =  alpha*np.ones(num_adversaries)# alpha*np.ones((1,num_adversaries))
@@ -53,9 +57,10 @@ class Unicycle:
         # self.adv_objective = [0] * num_adversaries
         # self.robot_objective = [0] * num_robots
         
-        num_constraints1  = num_robots - 1 + num_adversaries + num_obstacles
+        num_constraints1  = num_robots - 1 + num_adversaries + num_obstacles + num_connectivity
         self.A1 = np.zeros((num_constraints1,2))
         self.b1 = np.zeros((num_constraints1,1))
+        self.slack_constraint = np.zeros((num_constraints1,1))
         
         # For plotting
         self.adv_alphas = alpha*np.ones((1,num_adversaries))
@@ -69,6 +74,8 @@ class Unicycle:
         self.adv_hs = np.ones((1,num_adversaries))
         self.robot_hs = np.ones((1,num_robots))
         self.obs_hs = np.ones((1,num_obstacles))
+        self.robot_connectivity_alphas = np.ones((1,1))
+        self.robot_connectivity_hs = np.ones((1,1))
 
      
     def f(self):
@@ -138,26 +145,62 @@ class Unicycle:
         return -np.exp(k1-s)/( 1+np.exp( k1-s ) ) * ( 1 + self.sigma(s) )
     
     def agent_barrier(self,agent,d_min):
+        # beta = 1.01
+        # h = beta*d_min**2 - np.linalg.norm(self.X[0:2] - agent.X[0:2])**2
+        # h1 = h
+        
+        # theta = self.X[2,0]
+        # # s = (self.X[0:2] - agent.X[0:2]).T @ np.array( [np.sin(theta),np.cos(theta)] ).reshape(-1,1)
+        # s = (- self.X[0:2] + agent.X[0:2]).T @ np.array( [np.sin(theta),np.cos(theta)] ).reshape(-1,1)
+        # h = h - self.sigma(s)
+        # # print(f"h1:{h1}, h2:{h}")
+        # # assert(h1<0)
+        # der_sigma = self.sigma_der(s)
+        # dh_dxi = np.append( -2*( self.X[0:2] - agent.X[0:2] ).T - der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) ),  - der_sigma * ( np.cos(theta)*( self.X[0,0]-agent.X[0,0] ) - np.sin(theta)*( self.X[1,0] - agent.X[1,0] ) ) , axis=1)
+        
+        # if agent.type=='SingleIntegrator2D':
+        #     # dh_dxj = 2*( self.X[0:2] - agent.X[0:2] ).T
+        #     dh_dxj = 2*( self.X[0:2] - agent.X[0:2] ).T + der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) )
+        # elif agent.type=='Unicycle':
+        #     # dh_dxj = np.append( -2*( self.X[0:2] - agent.X[0:2] ).T + der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) ), np.array([[0]]), axis=1 )
+        #     dh_dxj = np.append( 2*( self.X[0:2] - agent.X[0:2] ).T + der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) ), np.array([[0]]), axis=1 )
+        # else:
+        #     dh_dxj = 2*( self.X[0:2] - agent.X[0:2] ).T
+ 
         beta = 1.01
-        h = beta*d_min**2 - np.linalg.norm(self.X[0:2] - agent.X[0:2])**2
+        h = np.linalg.norm(self.X[0:2] - agent.X[0:2])**2 - beta*d_min**2
         h1 = h
         
         theta = self.X[2,0]
-        s = (self.X[0:2] - agent.X[0:2]).T @ np.array( [np.sin(theta),np.cos(theta)] ).reshape(-1,1)
+        # s = (self.X[0:2] - agent.X[0:2]).T @ np.array( [np.sin(theta),np.cos(theta)] ).reshape(-1,1)
+        s = ( self.X[0:2] - agent.X[0:2]).T @ np.array( [np.sin(theta),np.cos(theta)] ).reshape(-1,1)
         h = h - self.sigma(s)
         # print(f"h1:{h1}, h2:{h}")
         # assert(h1<0)
         der_sigma = self.sigma_der(s)
-        dh_dxi = np.append( -2*( self.X[0:2] - agent.X[0:2] ).T - der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) ),  - der_sigma * ( np.cos(theta)*( self.X[0,0]-agent.X[0,0] ) - np.sin(theta)*( self.X[1,0] - agent.X[1,0] ) ) , axis=1)
+        dh_dxi = np.append( 2*( self.X[0:2] - agent.X[0:2] ).T - der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) ),  - der_sigma * ( np.cos(theta)*( self.X[0,0]-agent.X[0,0] ) - np.sin(theta)*( self.X[1,0] - agent.X[1,0] ) ) , axis=1)
         
         if agent.type=='SingleIntegrator2D':
             # dh_dxj = 2*( self.X[0:2] - agent.X[0:2] ).T
-            dh_dxj = 2*( self.X[0:2] - agent.X[0:2] ).T + der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) )
+            dh_dxj = -2*( self.X[0:2] - agent.X[0:2] ).T + der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) )
         elif agent.type=='Unicycle':
             # dh_dxj = np.append( -2*( self.X[0:2] - agent.X[0:2] ).T + der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) ), np.array([[0]]), axis=1 )
-            dh_dxj = np.append( 2*( self.X[0:2] - agent.X[0:2] ).T + der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) ), np.array([[0]]), axis=1 )
+            dh_dxj = np.append( -2*( self.X[0:2] - agent.X[0:2] ).T + der_sigma * ( np.array([ [np.sin(theta), np.cos(theta)] ]) ), np.array([[0]]), axis=1 )
         else:
-            dh_dxj = 2*( self.X[0:2] - agent.X[0:2] ).T
+            dh_dxj = -2*( self.X[0:2] - agent.X[0:2] ).T           
         
-        return h, dh_dxi, dh_dxj
+        
+        return -h, -dh_dxi, -dh_dxj
+    
+    def connectivity_barrier( self, agent, d_max ):
+        h = np.linalg.norm( self.X[0:2] - agent.X[0:2] )**2 - d_max**2
+        
+        dh_dxi = np.append( 2*( self.X[0:2] - agent.X[0:2] ).T, np.array([[0]]), axis = 1 )
+        if agent.type == 'SingleIntegrator2D':
+            dh_dxj = -2*( self.X[0:2] - agent.X[0:2] ).T
+        elif agent.type == 'Unicycle':
+            dh_dxj = np.append( -2*( self.X[0:2] - agent.X[0:2] ).T, np.array([[0]]), axis = 1 )
+        else:
+            dh_dxj = -2*( self.X[0:2] - agent.X[0:2] ).T
+        return h.reshape(-1,1), dh_dxi, dh_dxj        
     
