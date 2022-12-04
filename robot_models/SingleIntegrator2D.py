@@ -2,7 +2,7 @@ import numpy as np
 
 class SingleIntegrator2D:
     
-    def __init__(self,X0,dt,ax,id,num_robots=1,num_adversaries = 1, num_obstacles = 0, alpha=0.8,color='r',palpha=1.0,plot=True, num_connectivity = 1):
+    def __init__(self,X0,dt,ax,id,num_robots=1,num_adversaries = 1, num_obstacles = 0, alpha=0.8, eigen_alpha = 1.0, color='r',palpha=1.0,plot=True, num_connectivity = 1, num_eigen_connectivity = 0):
         '''
         X0: iniytial state
         dt: simulation time step
@@ -30,6 +30,7 @@ class SingleIntegrator2D:
             self.render_plot()
         
          # for Trust computation
+        self.eigen_alpha = eigen_alpha
         self.adv_alpha =  alpha*np.ones((1,num_adversaries))# alpha*np.ones((1,num_adversaries))
         self.trust_adv = np.ones((1,num_adversaries))
         self.obs_alpha =  alpha*np.ones((1,num_obstacles))#
@@ -55,7 +56,7 @@ class SingleIntegrator2D:
         # self.adv_objective = [0] * num_adversaries
         # self.robot_objective = [0] * num_robots
         
-        num_constraints1  = num_robots - 1 + num_adversaries + num_obstacles + num_connectivity
+        num_constraints1  = num_robots - 1 + num_adversaries + num_obstacles + num_connectivity + num_eigen_connectivity
         self.A1 = np.zeros((num_constraints1,2))
         self.b1 = np.zeros((num_constraints1,1))
         self.slack_constraint = np.zeros((num_constraints1,1))

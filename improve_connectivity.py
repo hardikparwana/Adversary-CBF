@@ -39,7 +39,7 @@ for i in range( num_steps ):
     for j in range( 1, len(robots) ):
         u = robots[j].lambda2_dx
         robots[j].step(u)
-        print(f" robot :{j}, input: {u} ")
+        # print(f" robot :{j}, input: {u} ")
     
     fig.canvas.draw()
     fig.canvas.flush_events()

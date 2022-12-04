@@ -7,6 +7,7 @@ from robot_models.SingleIntegrator2D import *
 from robot_models.Unicycle import *
 from robot_models.obstacles import *
 from utils.utils import *
+from graph_utils import *
 
 from matplotlib.animation import FFMpegWriter
 
@@ -18,7 +19,7 @@ tf = 9.0 #5.4#8#4.1 #0.2#4.1
 num_steps = int(tf/dt)
 t = 0
 d_min_obstacles = 1.0 #0.1
-d_min_agents = 0.2 #0.4
+d_min_agents = 0.5#0.2 #0.4
 d_max = 2.0
 
 h_min = 1.0##0.4   # more than this and do not decrease alpha
@@ -27,9 +28,10 @@ cbf_extra_bad = 0.0
 update_param = True
 bigNaN = 10000000
 
-
-alpha_cbf = 0.7 #0.8
+eigen_alpha = 0.8
+alpha_cbf = 2.0 #0.7 #0.8
 alpha_der_max = 0.1 #0.5#1.0#0.5
+lambda_thr = 0.2
 
 # Plot                  
 plt.ion()
@@ -43,11 +45,12 @@ ax.set_ylabel("Y")
 
 num_adversaries = 0
 num_obstacles = 3
-num_connectivity = 1
+num_connectivity = 0
+num_eigen_connectivity = 0
 alpha = 0.1
 
 save_plot = False
-movie_name = 'test_select_default.mp4'
+movie_name = 'test.mp4'
 
 # agents
 robots = []
@@ -56,12 +59,12 @@ num_robots = 6
 # robots.append( Unicycle(np.array([2.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, num_obstacles=num_obstacles ) )
 # robots.append( Unicycle(np.array([3.5,0,np.pi/2]), dt, ax, num_robots=num_robots, id = 2, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, num_obstacles=num_obstacles ) )
 
-robots.append( SingleIntegrator2D(np.array([3,1.5]), dt, ax, num_robots=num_robots, id = 0, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, num_obstacles=num_obstacles ) )
-robots.append( SingleIntegrator2D(np.array([2.6,0]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, num_obstacles=num_obstacles ) )
-robots.append( SingleIntegrator2D(np.array([3.5,0]), dt, ax, num_robots=num_robots, id = 2, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, num_obstacles=num_obstacles ) )
-robots.append( SingleIntegrator2D(np.array([2.5,0.8]), dt, ax, num_robots=num_robots, id = 3, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, num_obstacles=num_obstacles ) )
-robots.append( SingleIntegrator2D(np.array([3.0,0.8]), dt, ax, num_robots=num_robots, id = 4, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, num_obstacles=num_obstacles ) )
-robots.append( SingleIntegrator2D(np.array([3.5,0.8]), dt, ax, num_robots=num_robots, id = 5, color='g',palpha=1.0, alpha=alpha_cbf, num_adversaries=num_adversaries, num_obstacles=num_obstacles ) )
+robots.append( SingleIntegrator2D(np.array([3,1.5]), dt, ax, num_robots=num_robots, id = 0, color='g',palpha=1.0, alpha=alpha_cbf, eigen_alpha = eigen_alpha, num_connectivity = num_connectivity, num_adversaries=num_adversaries, num_obstacles=num_obstacles, num_eigen_connectivity=num_eigen_connectivity ) )
+robots.append( SingleIntegrator2D(np.array([2.6,0]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=1.0, alpha=alpha_cbf, eigen_alpha = eigen_alpha, num_connectivity = num_connectivity, num_adversaries=num_adversaries, num_obstacles=num_obstacles, num_eigen_connectivity=num_eigen_connectivity ) )
+robots.append( SingleIntegrator2D(np.array([3.5,0]), dt, ax, num_robots=num_robots, id = 2, color='g',palpha=1.0, alpha=alpha_cbf, eigen_alpha = eigen_alpha, num_connectivity = num_connectivity, num_adversaries=num_adversaries, num_obstacles=num_obstacles, num_eigen_connectivity=num_eigen_connectivity ) )
+robots.append( SingleIntegrator2D(np.array([2.5,0.8]), dt, ax, num_robots=num_robots, id = 3, color='g',palpha=1.0, alpha=alpha_cbf, eigen_alpha = eigen_alpha, num_connectivity = num_connectivity, num_adversaries=num_adversaries, num_obstacles=num_obstacles, num_eigen_connectivity=num_eigen_connectivity ) )
+robots.append( SingleIntegrator2D(np.array([3.0,0.8]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=1.0, alpha=alpha_cbf, eigen_alpha = eigen_alpha, num_connectivity = num_connectivity, num_adversaries=num_adversaries, num_obstacles=num_obstacles, num_eigen_connectivity=num_eigen_connectivity ) )
+robots.append( SingleIntegrator2D(np.array([3.5,0.8]), dt, ax, num_robots=num_robots, id = 5, color='g',palpha=1.0, alpha=alpha_cbf, eigen_alpha = eigen_alpha, num_connectivity = num_connectivity, num_adversaries=num_adversaries, num_obstacles=num_obstacles, num_eigen_connectivity=num_eigen_connectivity ) )
 
 # agent nominal version
 robots_nominal = []
@@ -70,7 +73,7 @@ robots_nominal.append( SingleIntegrator2D(np.array([3,1.5]), dt, ax, num_robots=
 robots_nominal.append( SingleIntegrator2D(np.array([2.9,0]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=alpha ) )
 robots_nominal.append( SingleIntegrator2D(np.array([3.5,0]), dt, ax, num_robots=num_robots, id = 2, color='g',palpha=alpha ) )
 robots_nominal.append( SingleIntegrator2D(np.array([2.5,0.8]), dt, ax, num_robots=num_robots, id = 3, color='g',palpha=alpha ) )
-robots_nominal.append( SingleIntegrator2D(np.array([3.0,0.8]), dt, ax, num_robots=num_robots, id = 4, color='g',palpha=alpha ) )
+robots_nominal.append( SingleIntegrator2D(np.array([3.0,0.8]), dt, ax, num_robots=num_robots, id = 1, color='g',palpha=alpha ) )
 robots_nominal.append( SingleIntegrator2D(np.array([3.5,0.8]), dt, ax, num_robots=num_robots, id = 5, color='g',palpha=alpha ) )
 U_nominal = np.zeros((2,num_robots))
 
@@ -93,7 +96,7 @@ obstacles.append( circle( 6.2,2.5,1.0,ax,2 ) )
 ###### 1: CBF Controller
 u1 = cp.Variable((2,1))
 u1_ref = cp.Parameter((2,1),value = np.zeros((2,1)) )
-num_constraints1  = num_robots - 1 + num_adversaries + num_obstacles + num_connectivity 
+num_constraints1  = num_robots - 1 + num_adversaries + num_obstacles + num_connectivity + num_eigen_connectivity
 A1 = cp.Parameter((num_constraints1,2),value=np.zeros((num_constraints1,2)))
 b1 = cp.Parameter((num_constraints1,1),value=np.zeros((num_constraints1,1)))
 slack_constraints1 = cp.Parameter( (num_constraints1,1), value = np.zeros((num_constraints1,1)) )
@@ -101,11 +104,25 @@ const1 = [A1 @ u1 <= b1 + slack_constraints1]
 objective1 = cp.Minimize( cp.sum_squares( u1 - u1_ref  ) )
 cbf_controller = cp.Problem( objective1, const1 )
 
+###### 3: CBF Controller relaxed
+u3 = cp.Variable((2,1))
+u3_ref = cp.Parameter((2,1),value = np.zeros((2,1)) )
+num_constraints3  = num_robots - 1 + num_adversaries + num_obstacles + num_connectivity + num_eigen_connectivity
+A3 = cp.Parameter((num_constraints3,2),value=np.zeros((num_constraints3,2)))
+b3 = cp.Parameter((num_constraints3,1),value=np.zeros((num_constraints3,1)))
+slack_constraints3 = cp.Variable( (num_constraints3-num_eigen_connectivity-num_obstacles,1), value = np.zeros((num_constraints3-num_eigen_connectivity-num_obstacles,1)) )
+factor_matrix = np.zeros( (num_constraints3, num_constraints3 - num_eigen_connectivity - num_obstacles) )  # 8 x 8 here
+for i in range(num_obstacles, num_constraints3-1):
+    factor_matrix[i,i-num_obstacles] = 1
+const3 = [A3 @ u3 <= b3 +  factor_matrix @ slack_constraints3 ]
+objective3 = cp.Minimize( cp.sum_squares( u3 - u3_ref  ) + 1000 * cp.sum_squares( slack_constraints3 ) )
+cbf_controller_relaxed = cp.Problem( objective3, const3 )
+
 
 ###### 2: Best case controller
 u2 = cp.Variable( (2,1) )
 Q2 = cp.Parameter( (1,2), value = np.zeros((1,2)) )
-num_constraints2 = num_robots - 1 + num_adversaries + num_obstacles + num_connectivity
+num_constraints2 = num_robots - 1 + num_adversaries + num_obstacles + num_connectivity + num_eigen_connectivity
 # minimze A u s.t to other constraints
 A2 = cp.Parameter((num_constraints2,2),value=np.zeros((num_constraints2,2)))
 b2 = cp.Parameter((num_constraints2,1),value=np.zeros((num_constraints2,1)))
@@ -115,52 +132,35 @@ const2 += [ cp.abs( u2[0,0] ) <= 7.0 ]
 const2 += [ cp.abs( u2[1,0] ) <= 7.0 ]
 objective2 = cp.Minimize( Q2 @ u2 )
 best_controller = cp.Problem( objective2, const2 )
-
-##########################################################################################
-      
-# for i in range(num_steps):
-    
-#     const_index = 0
-    
-#     ## Greedy's nominal movement
-#     u_greedy_nominal = np.array([1.0, 0.0])
-#     greedy_nominal[0].step(u_greedy_nominal)
-    
-#     ## Greedy's believed movement
-#     V_nominal, dV_dx_nominal = greedy[0].lyapunov( greedy_nominal[0].X  )
-#     greedy[0].x_dot_nominal = -1.0 * dV_dx_nominal.T /np.linalg.norm( dV_dx_nominal )
-    
-#     ## Greedy actual movement
-#     V, dV_dx = greedy[0].lyapunov( robots[0].X )
-#     greedy[0].U_ref = -1.0 * dV_dx.T / np.linalg.norm( dV_dx )
-        
-#     # Move nominal agents
-#     for j in range(num_robots):
-#         u_nominal = np.array([1.0,-0.5])
-#         robots_nominal[j].step( u_nominal )
-#         V, dV_dx = robots[j].lyapunov(robots_nominal[j].X)
-#         robots[j].x_dot_nominal = -3.0*dV_dx.T/np.linalg.norm(dV_dx)
-#         robots[j].U_ref = robots[j].nominal_input( robots_nominal[j] )
-#         print(f" {j} input: {robots[j].U_ref} ")
-#         robots_nominal[j].render_plot()
-        
-#     t = t + dt
-    
-#     fig.canvas.draw()
-#     fig.canvas.flush_events()
-    
-    
-# exit()
-
        
 metadata = dict(title='Movie Test', artist='Matplotlib',comment='Movie support!')
 writer = FFMpegWriter(fps=15, metadata=metadata)
 
 tp = []
 
+lambdas = []
+r_robustness = []
+
 with writer.saving(fig, movie_name, 100): 
 
     for i in range(num_steps):
+        
+        # Laplacina for connectivity
+        L = weighted_connectivity_undirected_laplacian(robots, max_dist = 6.0)
+        L_org = connectivity_undirected_laplacian(robots, max_dist = 6.0)
+        r_robust = directed_milp_r_robustness( L_org )
+        # rs_robust = directed_milp_rs_robustness( L_org, r_robust )
+        # print()
+        
+        Lambda, V = laplacian_eigen( L_org )
+        print(f" Eigen value:{ Lambda[1] }, diff: { Lambda[1]/2 - r_robust }, r:{ r_robust }")#, s:{ rs_robust } ")
+        lambda2_dx( robots, L, Lambda[1], V[:,1].reshape(-1,1) )
+        
+        lambdas.append(Lambda[1]/2)
+        r_robustness.append( r_robust )
+        
+        # weighted
+        Lambda, V = laplacian_eigen( L )
         
         const_index = 0
             
@@ -193,8 +193,27 @@ with writer.saving(fig, movie_name, 100):
                 
                 const_index = const_index + 1
                 
+            # # Max distance constraint for connectivity            
+            # if j!=0:                
+            #     h, dh_dxj, dh_dxk = robots[j].connectivity_barrier(robots[0], d_max)
+            #     robots[j].robot_connectivity_h = h
+            #     if h < 0:
+            #         robots[j].slack_constraint[const_index,0] = 0.0
+                
+                    
+            #     # Control QP constraint
+            #     robots[j].A1[const_index,:] = dh_dxj @ robots[j].g()
+            #     robots[j].b1[const_index] = -dh_dxj @ robots[j].f() - dh_dxk @ ( robots[0].f() + robots[0].g() @ robots[0].U ) - cbf_extra_bad - robots[j].robot_connectivity_alpha[0,0] * h
+                
+            #     # Best Case LP objective
+            #     robots[j].robot_connectivity_objective = dh_dxj @ robots[j].g()
+                
+            #     const_index = const_index + 1
+                
             # Min distance constraint
             for k in range(num_robots):
+                
+                # print(f" j:{j}, k:{k}, dist:{ np.linalg.norm( robots[j].X[0:2] - robots[k].X[0:2] ) } ")
                 
                 if k==j:
                     continue
@@ -216,22 +235,18 @@ with writer.saving(fig, movie_name, 100):
                 robots[j].robot_objective[k] = dh_dxj @ robots[j].g()
                 
                 const_index = const_index + 1
-                
-            # Max distance constraint for connectivity            
-            if j!=0:                
-                h, dh_dxj, dh_dxk = robots[j].connectivity_barrier(robots[0], d_max)
-                robots[j].robot_connectivity_h = h
-                if h < 0:
-                    robots[j].slack_constraint[const_index,0] = 0.0
-                
-                    
-                # Control QP constraint
-                robots[j].A1[const_index,:] = dh_dxj @ robots[j].g()
-                robots[j].b1[const_index] = -dh_dxj @ robots[j].f() - dh_dxk @ ( robots[0].f() + robots[0].g() @ robots[0].U ) - cbf_extra_bad - robots[j].robot_connectivity_alpha[0,0] * h
-                
-                # Best Case LP objective
-                robots[j].robot_connectivity_objective = dh_dxj @ robots[j].g()
-                
+           
+            #add connectivity constraint from eigenvalue
+            #for k in range(num_robots): # need lambda2>>0  (opposite of CBF definition in this code)
+            if num_eigen_connectivity>0:
+                dLambda_dxj = robots[j].lambda2_dx.reshape(1,-1)   # assuming single integrator right now
+                robots[j].A1[const_index,:] = -dLambda_dxj @ robots[j].g()
+                robots[j].b1[const_index] = dLambda_dxj @ robots[j].f() + robots[j].eigen_alpha * Lambda[1] - lambda_thr * robots[j].eigen_alpha
+                for k in range(num_robots):
+                    if j==k:
+                        continue
+                    dLambda_dxk = robots[k].lambda2_dx.reshape(1,-1)
+                    robots[j].b1[const_index] = robots[j].b1[const_index] + ( dLambda_dxk @ (robots[k].f() +  robots[k].g() @ robots[k].U ) )
                 const_index = const_index + 1
                 
             
@@ -248,154 +263,61 @@ with writer.saving(fig, movie_name, 100):
             slack_constraints1.value = robots[j].slack_constraint
             slack_constraints2.value = robots[j].slack_constraint
             
-            # Solve for trust factor            
-            if update_param:
-    
-                # for k in range(num_obstacles):
-                #     Q2.value = robots[j].obs_objective[k]
-                #     best_controller.solve(solver=cp.GUROBI)
-                #     if best_controller.status!='optimal':
-                #         print(f"LP status:{best_controller.status}")
-                                
-                #     h, dh_dxj, dh_dxk = robots[j].agent_barrier(obstacles[k], d_min_obstacles)  
-                    
-                #     # print(f"out, h:{h}, j:{j}, k:{k}, alpha:{robots[j].adv_alpha[0]}")
-                #     # assert(h<0.03)           
-                #     A = np.array([[0.0,0.0]])
-                #     b = -robots[j].obs_alpha[0,k] * h  - dh_dxj @ ( robots[j].f() + robots[j].g() @ u2.value )   #- dh_dxi @ robots[j].U
-                    
-                #     robots[j].trust_obs[0,k] = compute_trust( A, b, np.array([0,0]).reshape(-1,1), np.array([0,0]).reshape(-1,1), h, min_dist, h_min )  
-                #     # if robots[j].trust_obs[0,k]<0:
-                #     # print(f"{j}'s Trust of {k} Obstacle: {best_controller.status}: {robots[j].trust_obs[0,k]}, h:{h} ")    
-                #     robots[j].obs_alpha[0,k] = robots[j].obs_alpha[0,k] + alpha_der_max * robots[j].trust_obs[0,k]
-                #     if robots[j].obs_alpha[0,k] > 0.8:
-                #         robots[j].obs_alpha[0,k] = 0.8
-                #     if (robots[j].obs_alpha[0,k]<0):
-                #         robots[j].obs_alpha[0,k] = 0.01
-                    
-                # Min distance
-                const_index = num_obstacles
-                # print(f"j:{j}, const:{const_index}")
-                for k in range(num_robots):
-                    if k==j:
-                        continue
-                    
-                    if robots[j].slack_constraint[const_index,0] > bigNaN * 0.99:
-                        # print(f"j:{j} part, const:{const_index}")
-                        const_index += 1
-                        continue
-                
-                    Q2.value = robots[j].robot_objective[k]
-                    best_controller.solve(solver=cp.GUROBI)#, verbose=True)
-                    if best_controller.status!='optimal':
-                        print(f"LP status:{best_controller.status}")
-                        robots[j].slack_constraint[-1,0] = bigNaN
-                        slack_constraints1.value = robots[j].slack_constraint # robots[j].slack_constraint
-                        slack_constraints2.value = robots[j].slack_constraint #  robots[j].slack_constraint
-                        best_controller.solve(solver=cp.GUROBI)
-                        if best_controller.status!='optimal':
-                            # robots[j].slack_constraint[np.min(np.argmin(b2.value)),0] = bigNaN
-                            # slack_constraints1.value = robots[j].slack_constraint # robots[j].slack_constraint
-                            # slack_constraints2.value = robots[j].slack_constraint #  robots[j].slack_constraint
-                            # best_controller.solve(solver=cp.GUROBI)
-                            # if best_controller.status!='optimal':
-                            #     print(f"serious ERROR")
-                            #     exit()
-                            for kk in range(num_constraints2-1):
-                                if b2.value[kk,0] < 0:
-                                    robots[j].slack_constraint[kk,0] = bigNaN
-                            slack_constraints1.value = robots[j].slack_constraint # robots[j].slack_constraint
-                            slack_constraints2.value = robots[j].slack_constraint #  robots[j].slack_constraint
-                            best_controller.solve(solver=cp.GUROBI)
-                            if best_controller.status!='optimal':
-                                print(f"serious ERROR")
-                                exit()
-                    
-                            
-                    h, dh_dxi, dh_dxk = robots[j].agent_barrier(robots[k], d_min_agents);
-                    if  robots[j].slack_constraint[const_index,0] > bigNaN * 0.99:   
-                        const_index += 1  
-                        # print(f"j:{j} part, const:{const_index}")
-                        continue
-                    assert(h<0.01)
-                    A = dh_dxk 
-                    b = -robots[j].robot_alpha[0,k] * h - dh_dxi @ ( robots[j].f() + robots[j].g() @  u2.value) #- dh_dxi @ robots[j].U  # need best case U here. not previous U
-                    
-                    robots[j].trust_robot[0,k] = compute_trust( A, b, robots[k].f() + robots[k].g() @ robots[k].U, robots[k].x_dot_nominal, h, min_dist, h_min )            
-                    # if robots[j].trust_robot[0,k]<0:
-                    #     print(f"{j}'s Trust of {k} robot: {best_controller.status}: {robots[j].trust_robot[0,k]}, h:{h}")
-                    robots[j].robot_alpha[0,k] = robots[j].robot_alpha[0,k] + alpha_der_max * robots[j].trust_robot[0,k]
-                    if (robots[j].robot_alpha[0,k]<0):
-                        robots[j].robot_alpha[0,k] = 0.01
-                        
-                    const_index += 1
-                    # print(f"j:{j} full, const:{const_index}")
-                        
-                # Max distance
-                if j!=0 and robots[j].slack_constraint[-1,0] < bigNaN * 0.99:
-                    Q2.value = robots[j].robot_connectivity_objective
-                    best_controller.solve(solver=cp.GUROBI)#, verbose=True)
-                    if best_controller.status!='optimal':
-                        print(f"LP status:{best_controller.status}")
-                        robots[j].slack_constraint[-1,0] = bigNaN
-                        slack_constraints1.value = robots[j].slack_constraint # robots[j].slack_constraint
-                        slack_constraints2.value = robots[j].slack_constraint #  robots[j].slack_constraint
-                        best_controller.solve(solver=cp.GUROBI)
-                        if best_controller.status!='optimal':
-                            # robots[j].slack_constraint[np.min(np.argmin(b2.value)),0] = bigNaN
-                            # slack_constraints1.value = robots[j].slack_constraint # robots[j].slack_constraint
-                            # slack_constraints2.value = robots[j].slack_constraint #  robots[j].slack_constraint
-                            # best_controller.solve(solver=cp.GUROBI)
-                            # if best_controller.status!='optimal':
-                            #     print(f"serious ERROR")
-                            #     exit()
-                            for kk in range(num_constraints2-1):
-                                if b2.value[kk,0] < 0:
-                                    robots[j].slack_constraint[kk,0] = bigNaN
-                            slack_constraints1.value = robots[j].slack_constraint # robots[j].slack_constraint
-                            slack_constraints2.value = robots[j].slack_constraint #  robots[j].slack_constraint
-                            best_controller.solve(solver=cp.GUROBI)
-                            if best_controller.status!='optimal':
-                                print(f"serious ERROR")
-                                exit()
-                    
-                    if  robots[j].slack_constraint[-1,0] > bigNaN * 0.99:     
-                        continue
-                    h, dh_dxi, dh_dxk = robots[j].connectivity_barrier(robots[0], d_max);
-                    
-                    assert(h<0.01)
-                    A = dh_dxk 
-                    b = -robots[j].robot_connectivity_alpha[0,0] * h - dh_dxi @ ( robots[j].f() + robots[j].g() @  u2.value) #- dh_dxi @ robots[j].U  # need best case U here. not previous U
-                    
-                    robots[j].trust_robot_connectivity = compute_trust( A, b, robots[0].f() + robots[0].g() @ robots[0].U, robots[0].x_dot_nominal, h, min_dist, h_min )            
-                    # if robots[j].trust_robot[0,k]<0:
-                    #     print(f"{j}'s Trust of {k} robot: {best_controller.status}: {robots[j].trust_robot[0,k]}, h:{h}")
-                    robots[j].robot_connectivity_alpha[0,0] = robots[j].robot_connectivity_alpha[0,0] + alpha_der_max * robots[j].trust_robot_connectivity
-                    if (robots[j].robot_connectivity_alpha[0,0]<0):
-                        robots[j].robot_connectivity_alpha[0,0] = 0.01
-                        
-            # print(f" robot :{j}, alphas connectivity:{ robots[j].robot_connectivity_alpha }, robots:{ robots[j].robot_alpha }, obs:{ robots[j].obs_alpha }, h:{ robots[j].robot_connectivity_h } ")
-                
-            # Plotting
-            robots[j].adv_alphas = np.append( robots[j].adv_alphas, robots[j].adv_alpha, axis=0 )
-            robots[j].trust_advs = np.append( robots[j].trust_advs, robots[j].trust_adv, axis=0 )
-            robots[j].robot_alphas = np.append( robots[j].robot_alphas, robots[j].robot_alpha, axis=0 )
-            robots[j].trust_robots = np.append( robots[j].trust_robots, robots[j].trust_robot, axis=0 )
-            robots[j].robot_hs = np.append( robots[j].robot_hs, robots[j].robot_h, axis=0 )
-            robots[j].adv_hs = np.append( robots[j].adv_hs, robots[j].adv_h, axis=0 )
-            robots[j].obs_alphas = np.append( robots[j].obs_alphas, robots[j].obs_alpha, axis=0 )
-            robots[j].trust_obss = np.append( robots[j].trust_obss, robots[j].trust_obs, axis=0 )
-            robots[j].obs_hs = np.append( robots[j].obs_hs, robots[j].obs_h, axis=0 )
-            robots[j].robot_connectivity_alphas = np.append( robots[j].robot_connectivity_alphas, robots[j].robot_connectivity_alpha, axis = 0 )
-            robots[j].robot_connectivity_hs = np.append( robots[j].robot_connectivity_hs, robots[j].robot_connectivity_h, axis=0 )
-            
             # Solve for control input
-            u1_ref.value = robots[j].U_ref
-            cbf_controller.solve(solver=cp.GUROBI)#, verbose=True)
-            if cbf_controller.status!='optimal':
-                print(f"{j}'s input: {cbf_controller.status}")
-                exit()
-            robots[j].nextU = u1.value       
+            if j==0:
+                u1_ref.value = robots[j].U_ref
+                robots[j].nextU = u1_ref.value      
+            else:
+                u1_ref.value = 4*robots[j].lambda2_dx.reshape(-1,1)
+                if 0:
+                    u1_ref.value = robots[j].U_ref
+                if 0:#j==4:
+                    print(f" j:{j}, u1ref:{ u1_ref.value }, lambadref:{ 2*robots[j].lambda2_dx.reshape(1,-1) } ")
+                cbf_controller.solve(solver=cp.GUROBI, reoptimize=True)#, verbose=True)
+                
+                # check for dual variables
+                # for k in range(num_robots):
+                # print(f" j:{j}, duals:{ const1[0].dual_value } ")
+                
+                # find least feasible constraint and give it up completely
+                    
+                robots[j].nextU = u1.value 
+                if cbf_controller.status!='optimal':
+                    # robots[j].nextU = u1.value 
+                    
+                    # print(f"{j}'s input: {cbf_controller.status}")
+                    
+                    # # exit()
+                    # # If infeasible: now add slack
+                    # robots[j].slack_constraint[-2,0] = bigNaN  # no last one should remain no matter what
+                    # slack_constraints1.value = robots[j].slack_constraint # robots[j].slack_constraint    
+                    # print("hello")
+                    # cbf_controller.solve(solver=cp.GUROBI, reoptimize=True)
+                    # if cbf_controller.status!='optimal':
+                    #     for kk in range(num_constraints1-2):
+                    #         if b1.value[kk,0] < 0:
+                    #             robots[j].slack_constraint[kk,0] = bigNaN
+                    #     slack_constraints1.value = robots[j].slack_constraint # robots[j].slack_constraint
+                    #     cbf_controller.solve(solver=cp.GUROBI, reoptimize=True)
+                    #     if cbf_controller.status!='optimal':
+                    #         print(f"serious ERROR")
+                    #         exit()
+                    
+                    # solve relaxed problem
+                    A3.value = A1.value
+                    b3.value = b1.value
+                    u3_ref.value = u1_ref.value
+                    cbf_controller_relaxed.solve(solver=cp.GUROBI, reoptimize=True)
+                    if cbf_controller_relaxed.status!='optimal':
+                        print("Should not happen!")
+                        exit()
+                    
+                    robots[j].nextU = u3.value 
+                    
+                    
+                                
+                                
+                      
 
          
         for j in range(num_robots):
@@ -422,6 +344,17 @@ plt.ioff()
 
 # Plot
 
+
+
+# robustness
+figure9, axis9 = plt.subplots(1, 1)
+axis9.plot(lambdas,'*r', label='Eigenvalue')
+axis9.plot(r_robustness,'g', label='Mixed Integer')
+axis9.legend()
+axis9.set_xlabel('Time Index')
+
+plt.show()
+exit()
 ####### Alphas #######
 # Robot 0
 figure1, axis1 = plt.subplots(2, 2)
