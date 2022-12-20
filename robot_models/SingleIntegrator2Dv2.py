@@ -31,6 +31,7 @@ class SingleIntegrator2D:
         
          # for Trust computation
         self.eigen_alpha = eigen_alpha
+        self.leader_index = None
         
         self.obs_alpha =  alpha*np.ones((1,num_obstacles))#
         self.trust_obs = np.ones((1,num_obstacles))

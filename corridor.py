@@ -30,7 +30,7 @@ d_min_obstacles = 0.6 #0.1
 d_min_agents = 0.2#0.2 #0.4
 d_max = 2.0
 
-eigen_alpha = 0.8
+eigen_alpha = 0.8# 0.8
 alpha_cbf = 0.8#2.0 #0.7 #0.8
 
 save_plot = False
@@ -41,7 +41,7 @@ movie_name = 'test.mp4'
 obstacles = []
 index = 0
 x1 = -1.0
-x2 = 1.0
+x2 = 1.5 #1.0
 radius = 0.6
 y_s = 0
 y_increment = 0.3
@@ -62,7 +62,7 @@ for i in range(int( 10/y_increment )):
 
 numleaders = 0
 num_obstacles = len(obstacles)
-num_connectivity = 0
+num_connectivity = 1
 
 robots = []
 
@@ -89,7 +89,7 @@ robots.append( SingleIntegrator2D(np.array([0.3,y_offset - 3.0]), dt, ax, id = 2
 
 # plt.show()
 
-
+# exit()
 ############################## Optimization problems ######################################
 
 ###### 1: CBF Controller
@@ -109,11 +109,13 @@ u3_ref = cp.Parameter((2,1),value = np.zeros((2,1)) )
 num_constraints3  = num_robots - 1 + num_leaders + num_obstacles + num_connectivity
 A3 = cp.Parameter((num_constraints3,2),value=np.zeros((num_constraints3,2)))
 b3 = cp.Parameter((num_constraints3,1),value=np.zeros((num_constraints3,1)))
-slack_constraints3 = cp.Variable( (num_constraints3-num_connectivity-num_obstacles,1), value = np.zeros((num_constraints3-num_connectivity-num_obstacles,1)) )
-factor_matrix = np.zeros( (num_constraints3, num_constraints3 - num_connectivity - num_obstacles) )  # 8 x 8 here
-for i in range(num_obstacles, num_constraints3-1):
-    factor_matrix[i,i-num_obstacles] = 1
-const3 = [A3 @ u3 <= b3 +  factor_matrix @ slack_constraints3 ]
+slack_constraints3 = cp.Parameter((num_constraints3,1), value = np.zeros((num_constraints3,1)))
+const3 = [A3 @ u3 <= b3 + slack_constraints3 ]
+# slack_constraints3 = cp.Variable( (num_constraints3-num_connectivity-num_obstacles,1), value = np.zeros((num_constraints3-num_connectivity-num_obstacles,1)) )
+# factor_matrix = np.zeros( (num_constraints3, num_constraints3 - num_connectivity - num_obstacles) )  # 8 x 8 here
+# for i in range(num_obstacles, num_constraints3-1):
+#     factor_matrix[i,i-num_obstacles] = 1
+# const3 = [A3 @ u3 <= b3 +  factor_matrix @ slack_constraints3 ]
 objective3 = cp.Minimize( cp.sum_squares( u3 - u3_ref  ) + 1000 * cp.sum_squares( slack_constraints3 ) )
 cbf_controller_relaxed = cp.Problem( objective3, const3 )
 
@@ -158,6 +160,23 @@ with writer.saving(fig, movie_name, 100):
             
             const_index = 0
             
+            L = leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 6.0)
+            Lambda, V = laplacian_eigen( L )
+            # print(f" Eigen value:{ Lambda[1] }")#, s:{ rs_robust } ")
+            lambda2_dx( robots, L, Lambda[1], V[:,1].reshape(-1,1) )
+            
+            # Connectivity constraint: h < 0 here..  h = -eigen_value
+            h_lambda, h_lambda_dxi = -(Lambda[1]-5.0), -robots[i].lambda2_dx.reshape(1,-1)
+            robots[i].A1[const_index,:] = h_lambda_dxi @ robots[i].g()
+            robots[i].b1[const_index] = -robots[i].eigen_alpha * h_lambda - h_lambda_dxi @ robots[i].f()
+            for j in range(num_robots):
+                if j==i:
+                    continue
+                else:
+                    robots[i].b1[const_index] = robots[i].b1[const_index] - robots[j].lambda2_dx.reshape(1,-1) @ ( robots[j].f() + robots[j].g() @ robots[j].U )
+            const_index = const_index + 1
+            
+            # Obstacle avoidance
             for j in range(num_obstacles):
                 h, dh_dxi, dh_dxj = robots[i].agent_barrier(obstacles[j], d_min_obstacles)
                 robots[i].obs_h[0,j] = h
@@ -168,6 +187,7 @@ with writer.saving(fig, movie_name, 100):
                 
                 const_index = const_index + 1
             
+            # collision avoidance
             for j in range(num_robots):
                 
                 if j==i:
@@ -200,7 +220,54 @@ with writer.saving(fig, movie_name, 100):
             
             if cbf_controller.status!='optimal':
                 print("Infeasible")
-                exit()
+                # exit()
+                
+                # choose one leader only
+                print("Trying to choose leader 0")
+                robots[i].leader_index = 0
+                L0 = leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 6.0)
+                Lambda0, V0 = laplacian_eigen( L0 )   
+                print(f" Eigen value:{ Lambda0[1] }")#, s:{ rs_robust } ")   
+                
+                print("Trying to choose leader 1")
+                robots[i].leader_index = 1
+                L1 = leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 6.0)
+                Lambda1, V1 = laplacian_eigen( L1 )   
+                print(f" Eigen value:{ Lambda1[1] }")#, s:{ rs_robust } ")   
+                
+                if (Lambda0[1] > Lambda1[1]):
+                    robots[i].leader_index = 0
+                    L = L0
+                    Lambda = Lambda0
+                    V = V0
+                else:
+                    robots[i].leader_index = 1
+                    L = L1
+                    Lambda = Lambda1
+                    V = V1        
+                               
+                lambda2_dx( robots, L, Lambda[1], V[:,1].reshape(-1,1) )
+                h_lambda, h_lambda_dxi = -(Lambda[1]-5.0), -robots[i].lambda2_dx.reshape(1,-1)
+                
+                const_index = 0
+                A1.value[const_index,:] = h_lambda_dxi @ robots[i].g()
+                b1.value[const_index] = -robots[i].eigen_alpha * h_lambda - h_lambda_dxi @ robots[i].f()
+                for j in range(num_robots):
+                    if j==i:
+                        continue
+                    else:
+                        b1.value[const_index] = b1.value[const_index] - robots[j].lambda2_dx.reshape(1,-1) @ ( robots[j].f() + robots[j].g() @ robots[j].U )
+                
+                cbf_controller.solve(solver=cp.GUROBI, reoptimize=True)
+                print(f"Status:{cbf_controller.status}")
+                if cbf_controller.status!='optimal':
+                    print("Error")
+                    exit()
+                
+                robots[i].nextU = u1.value
+                
+                # exit()
+                
                 
         
         # implement control input
@@ -215,3 +282,37 @@ with writer.saving(fig, movie_name, 100):
         # writer.grab_frame()
         
                 
+                
+ # Lambda, V = laplacian_eigen( L0 )        
+                # print(f" Eigen value:{ Lambda[1] }")#, s:{ rs_robust } ")                
+                # lambda2_dx( robots, L, Lambda[1], V[:,1].reshape(-1,1) )
+                # h_lambda, h_lambda_dxi = -(Lambda[1]-5.0), -robots[i].lambda2_dx.reshape(1,-1)
+                # const_index = 0
+                # A1.value[const_index,:] = h_lambda_dxi @ robots[i].g()
+                # b1.value[const_index] = -robots[i].eigen_alpha * h_lambda - h_lambda_dxi @ robots[i].f()
+                # for j in range(num_robots):
+                #     if j==i:
+                #         continue
+                #     else:
+                #         b1.value[const_index] = b1.value[const_index] - robots[j].lambda2_dx.reshape(1,-1) @ ( robots[j].f() + robots[j].g() @ robots[j].U )
+                # cbf_controller.solve(solver=cp.GUROBI, reoptimize=True)
+                # print(f"Status:{cbf_controller.status}")
+                
+                # print("Trying to choose leader 1")
+                
+                # Lambda, V = laplacian_eigen( L1 )
+                
+                
+                # print(f" Eigen value:{ Lambda[1] }")#, s:{ rs_robust } ")                
+                # lambda2_dx( robots, L, Lambda[1], V[:,1].reshape(-1,1) )
+                # h_lambda, h_lambda_dxi = -(Lambda[1]-5.0), -robots[i].lambda2_dx.reshape(1,-1)
+                # const_index = 0
+                # A1.value[const_index,:] = h_lambda_dxi @ robots[i].g()
+                # b1.value[const_index] = -robots[i].eigen_alpha * h_lambda - h_lambda_dxi @ robots[i].f()
+                # for j in range(num_robots):
+                #     if j==i:
+                #         continue
+                #     else:
+                #         b1.value[const_index] = b1.value[const_index] - robots[j].lambda2_dx.reshape(1,-1) @ ( robots[j].f() + robots[j].g() @ robots[j].U )
+                # cbf_controller.solve(solver=cp.GUROBI, reoptimize=True)
+                # print(f"Status:{cbf_controller.status}")

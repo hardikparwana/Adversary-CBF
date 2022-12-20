@@ -98,10 +98,8 @@ def leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 1.0):
         robots[i].dA_dx = np.zeros( ( len(robots), len(robots), np.shape(robots[i].X)[0] ) )
     
     for i in range( len(robots) ):
+        for j in range(2):
         
-        dist_leader = 0
-        for j in range( i+1, len(robots) ):
-            
             # weight
             dist = np.linalg.norm( robots[i].X[0:2] - robots[j].X[0:2] )
             
@@ -114,7 +112,56 @@ def leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 1.0):
             der_j = np.array([0,0]).reshape(1,-1)
                 
             if dist <= rho:
-                A[i , j] = 1.0                
+                A[i, j] = 1.0                
+            elif dist >= max_dist:
+                A[i, j] = 0.0
+            else:
+                A[i, j] = np.exp( -gamma * (dist-rho) / (max_dist-rho)  )
+                der_i = A[i , j] * ( -gamma/(max_dist-rho) * d_dist_dxi )
+                der_j = A[i , j] * ( -gamma/(max_dist-rho) * d_dist_dxj )
+            
+            # or any other criteria
+            # A[j, i] = A[i, j]
+            
+            # i's Adjacency derivatives
+            robots[i].dA_dx[i,j,:] = der_i
+            robots[i].dA_dx[j,i,:] = der_i
+            
+            # j's Adjacency derivatives
+            # robots[j].dA_dx[i,j,:] = der_j
+            # robots[j].dA_dx[j,i,:] = der_j
+            
+            # Laplacian Derivatives
+            robots[i].dL_dx[i,j,:] = - robots[i].dA_dx[i,j,:]
+            robots[i].dL_dx[j,i,:] = - robots[i].dA_dx[j,i,:]
+            robots[i].dL_dx[i,i,:] = robots[i].dL_dx[i,i,:] + robots[i].dA_dx[i,j,:]
+            robots[i].dL_dx[j,j,:] = robots[i].dL_dx[j,j,:] + robots[i].dA_dx[j,i,:]
+            
+            # robots[j].dL_dx[i,j,:] = - robots[j].dA_dx[i,j,:]
+            # robots[j].dL_dx[j,i,:] = - robots[j].dA_dx[j,i,:]
+            # robots[j].dL_dx[i,i,:] = robots[j].dL_dx[i,i,:] + robots[j].dA_dx[i,j,:]
+            # robots[j].dL_dx[j,j,:]
+    
+    for i in range( len(robots) ):
+            
+        dist_leader = 0
+        # for j in range( i+1, len(robots) ):
+        for j in range( len(robots) ): # no longer symmetric
+            if j==0 or j==2:
+                continue
+            # weight
+            dist = np.linalg.norm( robots[i].X[0:2] - robots[j].X[0:2] )
+            
+            # weight gradient
+            d_dist_dxi = 1.0/dist * (robots[i].X[0:2] - robots[j].X[0:2] ).reshape(1,-1)
+            d_dist_dxj = - 1.0/dist * (robots[i].X[0:2] - robots[j].X[0:2] ).reshape(1,-1)
+            
+            # derivative w.r.t state
+            der_i = np.array([0,0]).reshape(1,-1)
+            der_j = np.array([0,0]).reshape(1,-1)
+                
+            if dist <= rho:
+                A[i, j] = 1.0                
             elif dist >= max_dist:
                 A[i, j] = 0.0
             else:
@@ -125,21 +172,29 @@ def leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 1.0):
             # Add leader connection weight to this and see what happens!    
             if i>=2: # 1,2   
                 # i: robot, j:leader
-
-                der_i = der_i * A[i, 0] * A[j, 0] * A[i, 1] * A[j, 1] + A[i, j] * robots[i].dA_dx[i,0,:] * A[j, 0] * A[i, 1] * A[j, 1] + A[i, j] * A[i, 0] * A[j, 0] * robots[i].dA_dx[i,1,:] * A[j, 1]
-                der_j = der_j * A[i, 0] * A[j, 0] * A[i, 1] * A[j, 1] + A[i, j] * A[i, 0] * robots[j].dA_dx[j,0,:] * A[i, 1] * A[j, 1] + A[i, j] * A[i, 0] * A[j, 0] * A[i, 1] * robots[j].dA_dx[j,1,:]
-                A[i, j] = A[i, j] * A[i, 0] * A[j, 0] * A[i, 1] * A[j, 0]
-                
+                if robots[i].leader_index == None:
+                    der_i = der_i * A[i, 0] * A[j, 0] * A[i, 1] * A[j, 1] + A[i, j] * robots[i].dA_dx[i,0,:] * A[j, 0] * A[i, 1] * A[j, 1] + A[i, j] * A[i, 0] * A[j, 0] * robots[i].dA_dx[i,1,:] * A[j, 1]
+                    der_j = der_j * A[i, 0] * A[j, 0] * A[i, 1] * A[j, 1] + A[i, j] * A[i, 0] * robots[j].dA_dx[j,0,:] * A[i, 1] * A[j, 1] + A[i, j] * A[i, 0] * A[j, 0] * A[i, 1] * robots[j].dA_dx[j,1,:]
+                    A[i, j] = A[i, j] * A[i, 0] * A[j, 0] * A[i, 1] * A[j, 1]
+                elif robots[i].leader_index == 0:
+                    der_i = der_i * A[i, 0] * A[j, 0] + A[i, j] * robots[i].dA_dx[i,0,:] * A[j, 0]
+                    der_j = der_j * A[i, 0] * A[j, 0] + A[i, j] * A[i, 0] * robots[j].dA_dx[j,0,:]
+                    A[i, j] = A[i, j] * A[i, 0] * A[j, 0]
+                elif robots[i].leader_index == 1:
+                    der_i = der_i * A[i, 1] * A[j, 1] + A[i, j] * robots[i].dA_dx[i,1,:] * A[j, 1]
+                    der_j = der_j * A[i, 1] * A[j, 1] + A[i, j] * A[i, 1] * robots[j].dA_dx[j,1,:]
+                    A[i, j] = A[i, j] * A[i, 1] * A[j, 1]
+                   
             # or any other criteria
-            A[j, i] = A[i, j]
+            # A[j, i] = A[i, j]
             
             # i's Adjacency derivatives
             robots[i].dA_dx[i,j,:] = der_i
             robots[i].dA_dx[j,i,:] = der_i
             
             # j's Adjacency derivatives
-            robots[j].dA_dx[i,j,:] = der_j
-            robots[j].dA_dx[j,i,:] = der_j
+            # robots[j].dA_dx[i,j,:] = der_j
+            # robots[j].dA_dx[j,i,:] = der_j
             
             # Laplacian Derivatives
             robots[i].dL_dx[i,j,:] = - robots[i].dA_dx[i,j,:]
@@ -147,10 +202,10 @@ def leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 1.0):
             robots[i].dL_dx[i,i,:] = robots[i].dL_dx[i,i,:] + robots[i].dA_dx[i,j,:]
             robots[i].dL_dx[j,j,:] = robots[i].dL_dx[j,j,:] + robots[i].dA_dx[j,i,:]
             
-            robots[j].dL_dx[i,j,:] = - robots[j].dA_dx[i,j,:]
-            robots[j].dL_dx[j,i,:] = - robots[j].dA_dx[j,i,:]
-            robots[j].dL_dx[i,i,:] = robots[j].dL_dx[i,i,:] + robots[j].dA_dx[i,j,:]
-            robots[j].dL_dx[j,j,:] = robots[j].dL_dx[j,j,:] + robots[j].dA_dx[j,i,:]
+            # robots[j].dL_dx[i,j,:] = - robots[j].dA_dx[i,j,:]
+            # robots[j].dL_dx[j,i,:] = - robots[j].dA_dx[j,i,:]
+            # robots[j].dL_dx[i,i,:] = robots[j].dL_dx[i,i,:] + robots[j].dA_dx[i,j,:]
+            # robots[j].dL_dx[j,j,:] = robots[j].dL_dx[j,j,:] + robots[j].dA_dx[j,i,:]
             
     # Degree matrix
     D = np.diag( np.sum( A, axis = 1 ) )
