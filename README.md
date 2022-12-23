@@ -11,11 +11,14 @@ The code has been developed and tested in Python 3.8.16. A virtual environment c
 ```
 python3.8 - virtualenv venv
 ```
-To activate the virtua environment
+To activate the virtual environment
 ```
 source venv/bin/avctivate
 ```
-To deactivate, just run `deactiave`
+To deactivate, just run `deactiave`. To install dependencies, run
+```
+pip install -r requirements.txt
+```
 
 # Simulation Results
 
