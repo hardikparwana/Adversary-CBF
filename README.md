@@ -46,7 +46,7 @@ python corridor.py
 ```
 python corridor_2leaders.py
 ```
-![2_leaders](https://user-images.githubusercontent.com/19849515/209387810-c288bf24-808c-4d6d-9bc8-fd11ca40f514.gif)
+![2_leaders](https://user-images.githubusercontent.com/19849515/209388638-61560fbe-97c4-4308-9013-a79531c88977.gif)
 
 
 ### Connectivity by maximum distance to leader constraint
