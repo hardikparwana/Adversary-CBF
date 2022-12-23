@@ -88,7 +88,7 @@ def leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 1.0):
     
     # thresholds
     rho =  1.0 #1.0 #0.5
-    gamma = 0.5 #0.5
+    gamma = 0.5
     
     # Adjacency Matrix
     A = np.zeros( ( len(robots), len(robots) ) )
@@ -100,18 +100,12 @@ def leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 1.0):
     # Each robot distance to one of the leader: decide only on element i,j (not j,i)
     for i in range( len(robots) ):
         for j in range(2):
-        #     if ( (j==i) or ( ( (i==0) and (j==1) ) or ( (i==1) and (j==0) ) ) ):
-        #         continue
-            if (j==i):
+            if j==i or (i==0 and j==1) or (i==1 and j==0):
                 continue
-            
             # weight
             dist = np.linalg.norm( robots[i].X[0:2] - robots[j].X[0:2] )
             if dist<0.01:
                 print(f"here i:{i}, j:{j}")
-                
-            if ( ( (i==0) and (j==1) ) or ( (i==1) and (j==0) ) ):
-                dist = 0
                 
             if not (robots[i].leader_index == None):
                 if robots[i].leader_index != j:
@@ -131,8 +125,8 @@ def leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 1.0):
                 d_dist_dxj = - 1.0/dist * (robots[i].X[0:2] - robots[j].X[0:2] ).reshape(1,-1)
             
                 A[i, j] = np.exp( -gamma * (dist-rho) / (max_dist-rho)  )
-                der_i = A[i ,j] * ( -gamma/(max_dist-rho) * d_dist_dxi )
-                der_j = A[i ,j] * ( -gamma/(max_dist-rho) * d_dist_dxj )
+                der_i = A[i , j] * ( -gamma/(max_dist-rho) * d_dist_dxi )
+                der_j = A[i , j] * ( -gamma/(max_dist-rho) * d_dist_dxj )
             
             # or any other criteria
             A[j, i] = A[i, j]
@@ -145,9 +139,6 @@ def leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 1.0):
             robots[j].dA_dx[i,j,:] = der_j
             robots[j].dA_dx[j,i,:] = der_j
             
-            # if ((i==3) and (j==0)) or ((i==0) and (j==3)):
-            #     print("here")
-            
             # Laplacian Derivatives
             robots[i].dL_dx[i,j,:] = - robots[i].dA_dx[i,j,:]
             robots[i].dL_dx[j,i,:] = - robots[i].dA_dx[j,i,:]
@@ -159,14 +150,10 @@ def leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 1.0):
             robots[j].dL_dx[i,i,:] = robots[j].dL_dx[i,i,:] + robots[j].dA_dx[i,j,:]
             robots[j].dL_dx[j,j,:] = robots[j].dL_dx[j,j,:] + robots[j].dA_dx[j,i,:]
      
-    A[0, 1] = 1
-    A[1, 0] = 1 
-     
     # directed graph update
     # positive if edge exists from i to j
     for i in range( len(robots) ):
-        if i==0 or i==1:
-            continue    
+            
         dist_leader = 0
         # for j in range( i+1, len(robots) ):
         for j in range( len(robots) ): # no longer symmetric
@@ -176,8 +163,8 @@ def leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 1.0):
             dist = np.linalg.norm( robots[i].X[0:2] - robots[j].X[0:2] )
             
             # consider agents from the same group only
-            if not ( (robots[i].leader_index == None) or (robots[j].leader_index==None) ):
-                if (robots[i].leader_index != robots[j].leader_index):
+            if not (robots[i].leader_index == None or robots[j].leader_index==None):
+                if robots[i].leader_index != robots[j].leader_index:
                     # print("DOING THIS")
                     dist = 0
                        

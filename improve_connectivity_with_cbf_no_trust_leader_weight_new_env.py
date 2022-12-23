@@ -14,7 +14,7 @@ plt.rcParams.update({'font.size': 15}) #27
 
 # Sim Parameters                  
 dt = 0.05
-tf = 15.0 #9.0 #5.4#8#4.1 #0.2#4.1
+tf = 13.0 #9.0 #5.4#8#4.1 #0.2#4.1
 num_steps = int(tf/dt)
 t = 0
 d_min_obstacles = 1.0 #0.1
@@ -37,7 +37,7 @@ plt.ion()
 fig = plt.figure()
 # ax = plt.axes(xlim=(0,7),ylim=(-0.5,8)) 
 # ax = plt.axes(xlim=(0,7),ylim=(-0.5,10)) 
-ax = plt.axes(xlim=(-5,20),ylim=(-5,15)) 
+ax = plt.axes(xlim=(-5,7),ylim=(-5,15)) 
 ax.set_xlabel("X")
 ax.set_ylabel("Y")
 # ax.set_aspect(1)
@@ -74,7 +74,7 @@ num_eigen_connectivity = 0
 alpha = 0.1
 
 save_plot = False
-movie_name = 'long_corridor_test.mp4'
+movie_name = 'long_corridor_single_leader.mp4'
 
 # agents
 robots = []
@@ -184,7 +184,7 @@ with writer.saving(fig, movie_name, 100):
     for i in range(num_steps):
         
         # Laplacina for connectivity
-        L = leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 8.0)
+        L = leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 6.0)
         # L = weighted_connectivity_undirected_laplacian(robots, max_dist = 6.0)
         # L_org = connectivity_undirected_laplacian(robots, max_dist = 6.0)
         r_robust = directed_milp_r_robustness( L )
@@ -203,7 +203,7 @@ with writer.saving(fig, movie_name, 100):
         # Move nominal agents
         for j in range(num_robots):
             # u_nominal = np.array([1.0,0.0])
-            u_nominal = np.array([0.0,2.0])
+            u_nominal = np.array([0.0,1.0])
             robots_nominal[j].step( u_nominal )
             V, dV_dx = robots[j].lyapunov(robots_nominal[j].X)
             robots[j].x_dot_nominal = -1.0*dV_dx.T/np.linalg.norm(dV_dx) # 3.0

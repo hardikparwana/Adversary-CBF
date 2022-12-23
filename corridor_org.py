@@ -6,7 +6,7 @@ from robot_models.SingleIntegrator2Dv2 import *
 from robot_models.Unicycle import *
 from robot_models.obstacles import *
 from utils.utils import *
-from graph_utils2 import *
+from graph_utils2_org import *
 
 from matplotlib.animation import FFMpegWriter
 
@@ -23,18 +23,18 @@ ax.set_ylabel("Y")
 
 # Sim Parameters                  
 dt = 0.05
-tf = 40.0 #5.4#8#4.1 #0.2#4.1
+tf = 20.0 #5.4#8#4.1 #0.2#4.1
 num_steps = int(tf/dt)
 t = 0
 d_min_obstacles = 0.6 #0.1
 d_min_agents = 0.2#0.4#0.2#0.2 #0.4
 d_max = 2.0
 
-eigen_alpha = 0.8#2.0# 0.8
-alpha_cbf = 0.8#2.0 #0.7 #0.8
+eigen_alpha = 2.0# 0.8
+alpha_cbf = 2.0 #0.7 #0.8
 
 save_plot = False
-movie_name = '2leader_diverge.mp4'
+movie_name = '2_leaders.mp4'
 
 
 ################# Make Obatacles ###############################
@@ -140,7 +140,7 @@ with writer.saving(fig, movie_name, 100):
             #     robots[i].leader_index = 1
         
         # with current leader index
-        L = leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 6.0) #6.0
+        L = leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 6.0)
         Lambda, V = laplacian_eigen( L )
         print(f" Eigen value:{ Lambda[1] }")#, s:{ rs_robust } ")
         lambda2_dx( robots, L, Lambda[1], V[:,1].reshape(-1,1) )
@@ -154,7 +154,7 @@ with writer.saving(fig, movie_name, 100):
                 # robots[i].U_ref = np.array([0.5, 0.5]).reshape(-1,1)
             elif i==1:
                 robots[i].U_ref = np.array([0.4, 0.2]).reshape(-1,1)
-                # robots[i].U_ref = np.array([0, 0.4]).reshape(-1,1)
+                # robots[i].U_ref = np.array([0, 1]).reshape(-1,1)
             else:              
                 robots[i].U_ref = 10*robots[i].lambda2_dx.reshape(-1,1)      
                 
@@ -170,9 +170,9 @@ with writer.saving(fig, movie_name, 100):
                 continue;  
             
             const_index = 0
-            # 6.5
+            
             # First constraint: Connectivity constraint: h < 0 here..  h = -eigen_value
-            h_lambda, h_lambda_dxi = -(Lambda[1]-0.0), -robots[i].lambda2_dx.reshape(1,-1)
+            h_lambda, h_lambda_dxi = -(Lambda[1]-6.5), -robots[i].lambda2_dx.reshape(1,-1)
             robots[i].A1[const_index,:] = h_lambda_dxi @ robots[i].g() 
             robots[i].b1[const_index] = -robots[i].eigen_alpha * h_lambda - h_lambda_dxi @ robots[i].f()
             for j in range(num_robots):
@@ -287,6 +287,8 @@ with writer.saving(fig, movie_name, 100):
             robots[i].step( robots[i].nextU )
             
         tp.append(t*dt)
+        
+        print("time: ",tp[-1])
         
         fig.canvas.draw()
         fig.canvas.flush_events()

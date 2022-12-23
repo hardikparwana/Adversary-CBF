@@ -47,7 +47,7 @@ num_connectivity = 1
 alpha = 0.1
 
 save_plot = False
-movie_name = 'test_greedy_select.mp4'
+movie_name = 'max_distance_no_trust.mp4'
 
 # agents
 robots = []
@@ -224,7 +224,6 @@ with writer.saving(fig, movie_name, 100):
                 if h < 0:
                     robots[j].slack_constraint[const_index,0] = 0.0
                 
-                    
                 # Control QP constraint
                 robots[j].A1[const_index,:] = dh_dxj @ robots[j].g()
                 robots[j].b1[const_index] = -dh_dxj @ robots[j].f() - dh_dxk @ ( robots[0].f() + robots[0].g() @ robots[0].U ) - cbf_extra_bad - robots[j].robot_connectivity_alpha[0,0] * h
@@ -324,7 +323,7 @@ with writer.saving(fig, movie_name, 100):
                     robots[j].trust_robot[0,k] = compute_trust( A, b, robots[k].f() + robots[k].g() @ robots[k].U, robots[k].x_dot_nominal, h, min_dist, h_min )            
                     # if robots[j].trust_robot[0,k]<0:
                     #     print(f"{j}'s Trust of {k} robot: {best_controller.status}: {robots[j].trust_robot[0,k]}, h:{h}")
-                    robots[j].robot_alpha[0,k] = robots[j].robot_alpha[0,k] + alpha_der_max * robots[j].trust_robot[0,k]
+                    # robots[j].robot_alpha[0,k] = robots[j].robot_alpha[0,k] + alpha_der_max * robots[j].trust_robot[0,k]
                     if (robots[j].robot_alpha[0,k]<0):
                         robots[j].robot_alpha[0,k] = 0.01
                         
