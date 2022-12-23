@@ -1,4 +1,4 @@
-# Adversary-CBF
+# Multi-agent Connectivity and Control with CBF
 
 
 This repository implements the work done during the term September-December 2022.
