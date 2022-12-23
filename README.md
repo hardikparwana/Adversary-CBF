@@ -9,7 +9,7 @@ This work considers a group of agents that are subjected to connectivity constra
 ## Requirements
 The code has been developed and tested in Python 3.8.16. A virtual environment can be first created using
 ```
-python3.8 - virtualenv venv
+python3.8 -m virtualenv venv
 ```
 To activate the virtual environment
 ```
