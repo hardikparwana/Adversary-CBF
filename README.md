@@ -1,10 +1,12 @@
 # Multi-agent Connectivity and Control with CBF
 
 
-This repository implements the work done during the term September-December 2022.
+This repository implements the work done during the term September-December 2022. 
 
 ## Description
 This work considers a group of agents that are subjected to connectivity constraints and multiple safety constraints. The connectivity is either imposed by enforcing maximum distance constraint w.r.t leader agent OR by using gradient of the eigenvalue of laplacian matrix of tne connectivity graph. Both the approaches are implemented.
+
+**Note:** While the theory in report has been goven for general dynamical systems, most implementations are still done for 2D single integrator agents only.
 
 ## Requirements
 The code has been developed and tested in Python 3.8.16. A virtual environment can be first created using
