@@ -203,7 +203,7 @@ with writer.saving(fig, movie_name, 100):
         # Move nominal agents
         for j in range(num_robots):
             # u_nominal = np.array([1.0,0.0])
-            u_nominal = np.array([0.0,1.0])
+            u_nominal = np.array([0.0,2.0])
             robots_nominal[j].step( u_nominal )
             V, dV_dx = robots[j].lyapunov(robots_nominal[j].X)
             robots[j].x_dot_nominal = -1.0*dV_dx.T/np.linalg.norm(dV_dx) # 3.0

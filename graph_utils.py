@@ -104,7 +104,7 @@ def leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 1.0):
             
             # weight
             dist = np.linalg.norm( robots[i].X[0:2] - robots[j].X[0:2] )
-            
+    
             # weight gradient
             d_dist_dxi = 1.0/dist * (robots[i].X[0:2] - robots[j].X[0:2] ).reshape(1,-1)
             d_dist_dxj = - 1.0/dist * (robots[i].X[0:2] - robots[j].X[0:2] ).reshape(1,-1)

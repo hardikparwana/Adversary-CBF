@@ -15,7 +15,7 @@ plt.rcParams.update({'font.size': 15}) #27
 # Plot                  
 plt.ion()
 fig = plt.figure()
-ax = plt.axes(xlim=(-5,20),ylim=(-5,15)) 
+ax = plt.axes(xlim=(-5,10),ylim=(-5,7)) 
 ax.set_xlabel("X")
 ax.set_ylabel("Y")
 # ax.set_aspect(1)
@@ -23,15 +23,15 @@ ax.set_ylabel("Y")
 
 # Sim Parameters                  
 dt = 0.05
-tf = 9.0 #5.4#8#4.1 #0.2#4.1
+tf = 40.0 #5.4#8#4.1 #0.2#4.1
 num_steps = int(tf/dt)
 t = 0
 d_min_obstacles = 0.6 #0.1
-d_min_agents = 0.2#0.2 #0.4
+d_min_agents = 0.2#0.4#0.2#0.2 #0.4
 d_max = 2.0
 
-eigen_alpha = 0.8# 0.8
-alpha_cbf = 0.8#2.0 #0.7 #0.8
+eigen_alpha = 2.0# 0.8
+alpha_cbf = 2.0 #0.7 #0.8
 
 save_plot = False
 movie_name = 'test.mp4'
@@ -40,23 +40,23 @@ movie_name = 'test.mp4'
 ################# Make Obatacles ###############################
 obstacles = []
 index = 0
-x1 = -1.0
+x1 = -1.0#-1.0
 x2 = 1.5 #1.0
 radius = 0.6
 y_s = 0
 y_increment = 0.3
-for i in range(int( 10/y_increment )):
+for i in range(int( 5/y_increment )):
     obstacles.append( circle( x1,y_s,radius,ax,0 ) ) # x,y,radius, ax, id
     obstacles.append( circle( x2,y_s,radius,ax,1 ) )
     y_s = y_s + y_increment
 
-y1 = obstacles[-1].X[1,0] 
-y2 = y1 + 3.0
-x_s = obstacles[-1].X[0,0]
-for i in range(int( 10/y_increment )):
-    obstacles.append( circle( x_s,y1,radius,ax,0 ) ) # x,y,radius, ax, id
-    obstacles.append( circle( x_s,y2,radius,ax,1 ) )
-    x_s = x_s + y_increment
+# y1 = obstacles[-1].X[1,0] 
+# y2 = y1 + 3.0
+# x_s = obstacles[-1].X[0,0]
+# for i in range(int( 10/y_increment )):
+#     obstacles.append( circle( x_s,y1,radius,ax,0 ) ) # x,y,radius, ax, id
+#     obstacles.append( circle( x_s,y2,radius,ax,1 ) )
+#     x_s = x_s + y_increment
     
 ###################################################################
 
@@ -132,6 +132,14 @@ with writer.saving(fig, movie_name, 100):
     
     for t in range(num_steps):
         
+        # for i in range(num_robots):
+        #     robots[i].leader_index = 1
+            # if i!=3:
+            #     robots[i].leader_index = 1
+            # else:
+            #     robots[i].leader_index = 1
+        
+        # with current leader index
         L = leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 6.0)
         Lambda, V = laplacian_eigen( L )
         print(f" Eigen value:{ Lambda[1] }")#, s:{ rs_robust } ")
@@ -142,13 +150,16 @@ with writer.saving(fig, movie_name, 100):
             #design
             
             if i==0:
-                robots[i].U_ref = np.array([0, 1]).reshape(-1,1)
+                robots[i].U_ref = np.array([0, 0.4]).reshape(-1,1)
+                # robots[i].U_ref = np.array([0.5, 0.5]).reshape(-1,1)
             elif i==1:
-                robots[i].U_ref = np.array([1, 1]).reshape(-1,1)
+                robots[i].U_ref = np.array([0.4, 0.2]).reshape(-1,1)
+                # robots[i].U_ref = np.array([0, 1]).reshape(-1,1)
             else:              
-                robots[i].U_ref = 10*robots[i].lambda2_dx.reshape(-1,1)           
-        
-            
+                robots[i].U_ref = 10*robots[i].lambda2_dx.reshape(-1,1)      
+                
+                 
+                
         # Design constraints
         for i in range(num_robots):
             
@@ -160,20 +171,16 @@ with writer.saving(fig, movie_name, 100):
             
             const_index = 0
             
-            L = leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 6.0)
-            Lambda, V = laplacian_eigen( L )
-            # print(f" Eigen value:{ Lambda[1] }")#, s:{ rs_robust } ")
-            lambda2_dx( robots, L, Lambda[1], V[:,1].reshape(-1,1) )
-            
-            # Connectivity constraint: h < 0 here..  h = -eigen_value
-            h_lambda, h_lambda_dxi = -(Lambda[1]-5.0), -robots[i].lambda2_dx.reshape(1,-1)
-            robots[i].A1[const_index,:] = h_lambda_dxi @ robots[i].g()
+            # First constraint: Connectivity constraint: h < 0 here..  h = -eigen_value
+            h_lambda, h_lambda_dxi = -(Lambda[1]-6.5), -robots[i].lambda2_dx.reshape(1,-1)
+            robots[i].A1[const_index,:] = h_lambda_dxi @ robots[i].g() 
             robots[i].b1[const_index] = -robots[i].eigen_alpha * h_lambda - h_lambda_dxi @ robots[i].f()
             for j in range(num_robots):
                 if j==i:
                     continue
                 else:
-                    robots[i].b1[const_index] = robots[i].b1[const_index] - robots[j].lambda2_dx.reshape(1,-1) @ ( robots[j].f() + robots[j].g() @ robots[j].U )
+                    dLambda_dxk = robots[j].lambda2_dx.reshape(1,-1)
+                    robots[i].b1[const_index] = robots[i].b1[const_index] + dLambda_dxk @ ( robots[j].f() + robots[j].g() @ robots[j].U )
             const_index = const_index + 1
             
             # Obstacle avoidance
@@ -200,7 +207,61 @@ with writer.saving(fig, movie_name, 100):
                 robots[i].b1[const_index] = -dh_dxi @ robots[i].f() - robots[i].robot_alpha[0,j] * h  #- dh_dxj @ ( robots[j].f() + robots[j].g() @ robots[j].U )
                 
                 const_index = const_index + 1
-                
+          
+        # check if feasible. if not, then select a leader based on greedy strategy: best case constraint margin to leader      
+        modified = False
+        for i in range(num_robots):
+            
+            if i < num_leaders:
+                continue
+            
+            A1.value = robots[i].A1
+            b1.value = robots[i].b1
+            
+            u1_ref.value = robots[i].U_ref
+            cbf_controller.solve(solver=cp.GUROBI, reoptimize=True)
+            
+            if cbf_controller.status!='optimal':
+                if robots[i].leader_index == None:
+                    
+                    # choose one leader only
+                    # based on distance
+                    if np.linalg.norm( robots[i].X-robots[0].X ) < np.linalg.norm( robots[i].X-robots[1].X ):
+                        robots[i].leader_index = 0
+                    else:
+                        robots[i].leader_index = 1
+                    print(f"i:{i} chose leader {robots[i].leader_index}")
+                    modified = True
+                else:
+                    modified = True
+                    print("Error: already selected leader but still infeasible")
+                    # exit()
+                    
+        if modified:
+            t = t - 1
+            continue
+            # reform the laplacian
+            L = leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 6.0)
+            Lambda, V = laplacian_eigen( L )
+            print(f" Eigen value:{ Lambda[1] }")#, s:{ rs_robust } ")
+            lambda2_dx( robots, L, Lambda[1], V[:,1].reshape(-1,1) )
+        
+        # remake the constraint
+        # for i in range(num_robots):
+        #     if i<num_leaders: # leaders
+        #         continue;  
+            
+        #     const_index = 0
+            
+        #     # First constraint: Connectivity constraint: h < 0 here..  h = -eigen_value
+        #     h_lambda, h_lambda_dxi = -(Lambda[1]-5.0), -robots[i].lambda2_dx.reshape(1,-1)
+        #     robots[i].A1[const_index,:] = h_lambda_dxi @ robots[i].g()
+        #     robots[i].b1[const_index] = -robots[i].eigen_alpha * h_lambda - h_lambda_dxi @ robots[i].f()
+        #     for j in range(num_robots):
+        #         if j==i:
+        #             continue
+        #         else:
+        #             robots[i].b1[const_index] = robots[i].b1[const_index] - robots[j].lambda2_dx.reshape(1,-1) @ ( robots[j].f() + robots[j].g() @ robots[j].U )
         
         # get control input
         for i in range(num_robots):
@@ -219,57 +280,8 @@ with writer.saving(fig, movie_name, 100):
             robots[i].nextU = u1.value
             
             if cbf_controller.status!='optimal':
-                print("Infeasible")
-                # exit()
-                
-                # choose one leader only
-                print("Trying to choose leader 0")
-                robots[i].leader_index = 0
-                L0 = leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 6.0)
-                Lambda0, V0 = laplacian_eigen( L0 )   
-                print(f" Eigen value:{ Lambda0[1] }")#, s:{ rs_robust } ")   
-                
-                print("Trying to choose leader 1")
-                robots[i].leader_index = 1
-                L1 = leader_weighted_connectivity_undirected_laplacian(robots, max_dist = 6.0)
-                Lambda1, V1 = laplacian_eigen( L1 )   
-                print(f" Eigen value:{ Lambda1[1] }")#, s:{ rs_robust } ")   
-                
-                if (Lambda0[1] > Lambda1[1]):
-                    robots[i].leader_index = 0
-                    L = L0
-                    Lambda = Lambda0
-                    V = V0
-                else:
-                    robots[i].leader_index = 1
-                    L = L1
-                    Lambda = Lambda1
-                    V = V1        
-                               
-                lambda2_dx( robots, L, Lambda[1], V[:,1].reshape(-1,1) )
-                h_lambda, h_lambda_dxi = -(Lambda[1]-5.0), -robots[i].lambda2_dx.reshape(1,-1)
-                
-                const_index = 0
-                A1.value[const_index,:] = h_lambda_dxi @ robots[i].g()
-                b1.value[const_index] = -robots[i].eigen_alpha * h_lambda - h_lambda_dxi @ robots[i].f()
-                for j in range(num_robots):
-                    if j==i:
-                        continue
-                    else:
-                        b1.value[const_index] = b1.value[const_index] - robots[j].lambda2_dx.reshape(1,-1) @ ( robots[j].f() + robots[j].g() @ robots[j].U )
-                
-                cbf_controller.solve(solver=cp.GUROBI, reoptimize=True)
-                print(f"Status:{cbf_controller.status}")
-                if cbf_controller.status!='optimal':
-                    print("Error")
-                    exit()
-                
-                robots[i].nextU = u1.value
-                
-                # exit()
-                
-                
-        
+                print("Error: should not have been infeasible here")
+                        
         # implement control input
         for i in range(num_robots):
             robots[i].step( robots[i].nextU )
