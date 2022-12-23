@@ -20,6 +20,15 @@ To deactivate, just run `deactiave`. To install dependencies, run
 pip install -r requirements.txt
 ```
 
+## How to run the code
+
+The examples files are present in the root folder. The robots and obstacles are defined as classes and their source code is included in the folder `robot_models`. Therefore, to make, for example, a single integrator model robot and obstacle, we simply import the following
+```
+from robot_models.SingleIntegrator2D import *
+from robot_models.obstacles import *
+```
+The `obstacles.py` has rectangle and circles implemented. Only circles are used for simulation resul though.
+
 # Simulation Results
 
 | Trust based adaptation | Constant CBF parameter(small) | Constant CBF parameter(large) |
