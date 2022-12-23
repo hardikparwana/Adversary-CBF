@@ -40,11 +40,14 @@ The `obstacles.py` has rectangle and circles implemented. Only circles are used 
 ```
 python corridor.py
 ```
+![long_corridor_single_leader](https://user-images.githubusercontent.com/19849515/209387601-4f6b23a8-6225-4220-bdcc-4e653d45de2e.gif)
 
 - 2 diverging leaders: CBF for collision avoidance + CBF for minimum eigenvalue + eigenvalue gradient as reference input
 ```
 python corridor_2leaders.py
 ```
+![2_leaders](https://user-images.githubusercontent.com/19849515/209387810-c288bf24-808c-4d6d-9bc8-fd11ca40f514.gif)
+
 
 ### Connectivity by maximum distance to leader constraint
 Each agent uses CBFs for enfocing collision avoidance with other agents and one more CBF for enforcing maximum allowable distance to the leader
@@ -53,3 +56,4 @@ Each agent uses CBFs for enfocing collision avoidance with other agents and one 
 ```
 python obstacle_leader.py
 ```
+![max_distance](https://user-images.githubusercontent.com/19849515/209388098-e1f84802-ae74-4618-96c4-c29a3ba68b96.gif)
