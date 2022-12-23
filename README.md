@@ -19,6 +19,7 @@ To deactivate, just run `deactiave`. To install dependencies, run
 ```
 pip install -r requirements.txt
 ```
+**Note:** The code uses `cvxpy` to frame and solve the Quadratic Program based controller. It uses GUROBI under the hood but if Gurobi is not available, simply remove the phrase `solver=cp.GUROBI` from all the codes. it will then use the free solver that comes with cvxpy.
 
 ## How to run the code
 
