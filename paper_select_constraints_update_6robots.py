@@ -284,7 +284,7 @@ with writer.saving(fig, movie_name, 100):
                         const_index += 1
                         continue
                 
-                    Q2.value = robots[j].robot_objective[k]
+                    # Q2.value = robots[j].robot_objective[k]
                     best_controller.solve(solver=cp.GUROBI)#, verbose=True)
                     if best_controller.status!='optimal':
                         print(f"LP status:{best_controller.status}")
@@ -332,7 +332,7 @@ with writer.saving(fig, movie_name, 100):
                         
                 # Max distance
                 if j!=0 and robots[j].slack_constraint[-1,0] < bigNaN * 0.99:
-                    Q2.value = robots[j].robot_connectivity_objective
+                    # Q2.value = robots[j].robot_connectivity_objective
                     best_controller.solve(solver=cp.GUROBI)#, verbose=True)
                     if best_controller.status!='optimal':
                         print(f"LP status:{best_controller.status}")
@@ -369,9 +369,9 @@ with writer.saving(fig, movie_name, 100):
                     robots[j].trust_robot_connectivity = compute_trust( A, b, robots[0].f() + robots[0].g() @ robots[0].U, robots[0].x_dot_nominal, h, min_dist, h_min )            
                     # if robots[j].trust_robot[0,k]<0:
                     #     print(f"{j}'s Trust of {k} robot: {best_controller.status}: {robots[j].trust_robot[0,k]}, h:{h}")
-                    robots[j].robot_connectivity_alpha[0,0] = robots[j].robot_connectivity_alpha[0,0] + alpha_der_max * robots[j].trust_robot_connectivity
-                    if (robots[j].robot_connectivity_alpha[0,0]<0):
-                        robots[j].robot_connectivity_alpha[0,0] = 0.01
+                    # robots[j].robot_connectivity_alpha[0,0] = robots[j].robot_connectivity_alpha[0,0] + alpha_der_max * robots[j].trust_robot_connectivity
+                    # if (robots[j].robot_connectivity_alpha[0,0]<0):
+                    #     robots[j].robot_connectivity_alpha[0,0] = 0.01
                         
             # print(f" robot :{j}, alphas connectivity:{ robots[j].robot_connectivity_alpha }, robots:{ robots[j].robot_alpha }, obs:{ robots[j].obs_alpha }, h:{ robots[j].robot_connectivity_h } ")
                 
