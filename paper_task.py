@@ -43,8 +43,8 @@ alpha = 0.1
 
 default_plot = True
 adapt_plot = False
-save_plot = True
-movie_name = 'test0_default.mp4'
+# save_plot = True
+movie_name = 'no_adapt.mp4'
 
 # agents
 robots = []
@@ -68,9 +68,9 @@ U_nominal = np.zeros((2,num_robots))
 
 # Uncooperative
 greedy = []
-greedy.append( SingleIntegrator2D(np.array([0,4]), dt, ax, color='r',palpha=1.0) )
-greedy.append( SingleIntegrator2D(np.array([0,5]), dt, ax, color='r',palpha=1.0) )
-greedy.append( SingleIntegrator2D(np.array([7,7]), dt, ax, color='r',palpha=1.0) )
+greedy.append( SingleIntegrator2D(np.array([0,4]), dt, ax, color='r',palpha=1.0, plot = adapt_plot) )
+greedy.append( SingleIntegrator2D(np.array([0,5]), dt, ax, color='r',palpha=1.0, plot = adapt_plot) )
+greedy.append( SingleIntegrator2D(np.array([7,7]), dt, ax, color='r',palpha=1.0, plot = adapt_plot) )
 
 greedy_default = []
 greedy_default.append( SingleIntegrator2D(np.array([0,4]), dt, ax, color='r',palpha=1.0, plot=default_plot) )
@@ -405,7 +405,7 @@ with writer.saving(fig, movie_name, 100):
         fig.canvas.draw()
         fig.canvas.flush_events()
         
-        # writer.grab_frame()
+        writer.grab_frame()
     
 plt.ioff()   
 
@@ -546,7 +546,35 @@ axis8.plot(tp,robots[0].robot_alphas[1:,2],'k',label='Robot 3')
 axis8.set_ylabel(r'Robot 1 \alpha_{1j}')
 axis8.set_xlabel('time (s)')
 axis8.legend()
+plt.rcParams.update({'font.size': 12})
+figure9, axis9 = plt.subplots(1, 2)
+axis9[0].plot(tp,robots[0].adv_alphas[1:,0],'r',label='Adversary')
+axis9[0].plot(tp,robots[0].robot_alphas[1:,1],'g',label='Robot 2')
+axis9[0].plot(tp,robots[0].robot_alphas[1:,2],'k',label='Robot 3')
+axis9[0].plot(tp,robots[0].adv_alphas[1:,1],'c',label='UC1')
+axis9[0].plot(tp,robots[0].adv_alphas[1:,2],'m',label='UC2')
+axis9[0].set_ylabel(r'Robot 1 $\theta_{\alpha_{1j}}$')
+axis9[0].set_xlabel('time (s)')
+axis9[0].legend()
+axis9[0].grid()
 
+axis9[1].plot(tp,-robots[0].adv_hs[1:,0],'r',label='Adversary - Proposed')
+axis9[1].plot(tp,-robots[0].robot_hs[1:,1],'g',label='Robot 2 - Proposed')
+axis9[1].plot(tp,-robots[0].robot_hs[1:,2],'k',label='Robot 3 - Proposed')
+axis9[1].plot(tp,-robots[0].adv_hs[1:,1],'c',label='UC1 - Proposed')
+axis9[1].plot(tp,-robots[0].adv_hs[1:,2],'m',label='UC2 - Proposed')
+axis9[1].plot(tp,-robots_default[0].adv_hs[1:,0],'r--',label=r'Adversary - fixed $\theta_{\alpha}$')
+axis9[1].plot(tp,-robots_default[0].robot_hs[1:,1],'g--',label=r'Robot 2 - fixed $\theta_{\alpha}$')
+axis9[1].plot(tp,-robots_default[0].robot_hs[1:,2],'k--',label=r'Robot 3 - fixed $\theta_{\alpha}$')
+axis9[1].plot(tp,-robots_default[0].adv_hs[1:,1],'c--',label=r'UC1 - fixed $\theta_{\alpha}$')
+axis9[1].plot(tp,-robots_default[0].adv_hs[1:,2],'m--',label=r'UC2 - fixed $\theta_{\alpha}$')
+axis9[1].legend()
+axis9[1].set_xlabel('time (s)')
+axis9[1].set_ylabel(r'Barrier Function $h_{1j}$')
+axis9[1].grid()
+
+
+plt.show()
 figure4, axis4 = plt.subplots(1, 1)
 plt.rcParams.update({'font.size': 10})
 plt.xlim([0,7])
@@ -662,5 +690,8 @@ if save_plot:
     figure8.savefig("new_alphas.eps")
     figure8.savefig("new_alphas.png")
     figure6.savefig("new_trust_common.png")
+    
+    figure9.savefig("combined_barrier_alpha.eps")
+    figure9.savefig("combined_barrier_alpha.png")
     
 plt.show()

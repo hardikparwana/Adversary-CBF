@@ -16,8 +16,8 @@ class rectangle:
 
     def render(self,ax):
 
-        rect = Rectangle((self.X[0],self.X[1]),self.width,self.height,linewidth = 1, edgecolor='k',facecolor='k')
-        ax.add_patch(rect)
+        self.rect = Rectangle((self.X[0],self.X[1]),self.width,self.height,linewidth = 1, edgecolor='k',facecolor='k')
+        ax.add_patch(self.rect)
 
 
 class circle:
